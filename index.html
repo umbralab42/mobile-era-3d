@@ -1,0 +1,5500 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Еволюція Сервісів Людства (1975–2026): 3D Лінійна Шкала та Глобус Зашореності</title>
+  <style>
+    :root {
+      --bg-dark: #070913;
+      --panel-bg: rgba(13, 18, 34, 0.85);
+      --panel-border: rgba(110, 145, 255, 0.25);
+      --accent: #38bdf8;
+      --accent-2: #a855f7;
+      --danger: #f43f5e;
+      --warn: #f59e0b;
+      --ok: #10b981;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Ефект віньєтки "зашореності" (тунельний зір) */
+    #blinders-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      transition: background 0.35s ease, box-shadow 0.35s ease;
+      background: radial-gradient(circle at center, transparent 75%, rgba(0, 0, 0, 0.3) 100%);
+    }
+
+    /* Верхня панель керування */
+    .top-bar {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .glass-panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 12px 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+      pointer-events: auto;
+    }
+
+    .title-block h1 {
+      font-size: 1.08rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      background: linear-gradient(90deg, #38bdf8, #c084fc, #f43f5e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 3px;
+    }
+
+    .title-block p {
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+
+    /* Перемикач режимів */
+    .mode-switcher {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .mode-btn {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.22s ease;
+    }
+
+    .mode-btn:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(168, 85, 247, 0.28));
+      border-color: var(--accent);
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+    }
+
+    .mode-btn.danger-mode.active {
+      background: linear-gradient(135deg, rgba(244, 63, 94, 0.32), rgba(168, 85, 247, 0.32));
+      border-color: var(--danger);
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+    }
+
+    /* Ліва панель статистики, Профілю Людини та "Зашореності" */
+    .stats-sidebar {
+      position: fixed;
+      top: 86px;
+      left: 16px;
+      width: 330px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: calc(100vh - 205px);
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .stats-sidebar::-webkit-scrollbar {
+      width: 5px;
+    }
+    .stats-sidebar::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 6px;
+    }
+
+    .profile-select-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .profile-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .custom-select, .search-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 10px;
+      padding: 7px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .search-input {
+      cursor: text;
+      font-weight: 500;
+    }
+
+    .custom-select:hover, .custom-select:focus, .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+
+    .custom-select option {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+
+    .dedup-note {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      line-height: 1.3;
+      background: rgba(16, 185, 129, 0.08);
+      border-left: 3px solid var(--ok);
+      padding: 5px 8px;
+      border-radius: 4px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+
+    .metric-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .metric-value {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-top: 2px;
+      color: var(--accent);
+    }
+
+    .blinders-meter {
+      margin-top: 10px;
+    }
+
+    .meter-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .meter-bar-bg {
+      width: 100%;
+      height: 9px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .meter-bar-fill {
+      height: 100%;
+      width: 10%;
+      background: linear-gradient(90deg, #10b981, #f59e0b, #f43f5e);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .era-description {
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: #cbd5e1;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .era-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.18);
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    /* Контролер додаткових налаштувань зашореності */
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .control-row label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+      cursor: pointer;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.76rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+
+    /* Нижня панель таймлайну */
+    .bottom-timeline {
+      position: fixed;
+      bottom: 14px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .play-btn {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      color: #050811;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .play-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.5);
+    }
+
+    .year-display {
+      font-size: 1.6rem;
+      font-weight: 900;
+      min-width: 74px;
+      text-align: center;
+      color: #fff;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+    }
+
+    .slider-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .decade-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--muted);
+      padding: 0 4px;
+    }
+
+    .decade-ticks span {
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .decade-ticks span:hover {
+      color: var(--accent);
+    }
+
+    /* Спливаюча підказка при наведенні на 3D-іконку бренду */
+    #brand-tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 30;
+      background: rgba(10, 14, 28, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.55);
+      border-radius: 14px;
+      padding: 12px 15px;
+      min-width: 240px;
+      max-width: 310px;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.75);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    #brand-tooltip.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .tt-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .tt-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 11px;
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    .tt-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .tt-year {
+      font-size: 0.73rem;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    .tt-regions {
+      font-size: 0.68rem;
+      color: #a7f3d0;
+      margin-top: 2px;
+    }
+
+    .tt-desc {
+      font-size: 0.77rem;
+      color: #cbd5e1;
+      line-height: 1.36;
+      margin-bottom: 6px;
+    }
+
+    .tt-drain {
+      font-size: 0.72rem;
+      color: #fda4af;
+      font-weight: 600;
+    }
+
+    /* Права легенда категорій */
+    .legend-panel {
+      position: fixed;
+      top: 86px;
+      right: 16px;
+      z-index: 10;
+      width: 235px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .legend-title {
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 3px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      padding: 5px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .legend-item:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .legend-item.active-cat {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: var(--accent);
+    }
+
+    .legend-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .hint-pill {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 5px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 900px) {
+      .stats-sidebar {
+        width: 260px;
+      }
+      .legend-panel {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+  <div id="blinders-overlay"></div>
+
+  <!-- Верхній бар -->
+  <div class="top-bar">
+    <div class="glass-panel title-block">
+      <h1>Еволюція Сервісів Людства (1975–2026) та «Зашореність»</h1>
+      <p>247 унікальних екосистем та брендів усіх країн світу (без задвоєнь франшиз та ребрендингів)</p>
+    </div>
+
+    <div class="glass-panel mode-switcher">
+      <button class="mode-btn active" id="btn-linear" onclick="setViewMode('linear')">
+        <span>📈</span> 3D Лінійний Графік (По роках)
+      </button>
+      <button class="mode-btn" id="btn-globe" onclick="setViewMode('globe')">
+        <span>🌐</span> 3D Глобус навколо Людини
+      </button>
+      <button class="mode-btn danger-mode" id="btn-inside" onclick="setViewMode('inside')">
+        <span>👁️</span> Погляд зсередини («Зашореність»)
+      </button>
+    </div>
+  </div>
+
+  <!-- Ліва панель: Перемикач Профілю Людини, Статистика та Керування -->
+  <div class="stats-sidebar">
+    <!-- Блок 1: Перемикач профілю людини -->
+    <div class="glass-panel profile-select-group">
+      <div class="profile-label">
+        <span>🌍 Профіль людини (Країни / Регіон)</span>
+        <span id="profile-total-pill" style="color:#10b981;">247 серв.</span>
+      </div>
+      <select class="custom-select" id="region-select">
+        <option value="all" selected>🌍 Увесь Світ (Всі країни без дублів — 247)</option>
+        <option value="ua">🇺🇦 Україна + Глобальні (203 сервіси)</option>
+        <option value="west">🇪🇺🇺🇸 Захід: Європа, США, Канада (189)</option>
+        <option value="asia">🌏 Азія: Китай, Японія, Корея, Індія (200)</option>
+        <option value="latam_mena">🌎 Лат. Америка, Близький Схід, Африка (185)</option>
+        <option value="global_only">🌐 Лише глобальні транс-континентальні (171)</option>
+      </select>
+
+      <div class="profile-label" style="margin-top: 4px;">
+        <span>👤 Спосіб життя / Фокус діяльності</span>
+      </div>
+      <select class="custom-select" id="persona-select">
+        <option value="all" selected>👤 Повний спектр (Усі сфери життя)</option>
+        <option value="work_ai">💻 Айтішник / Офіс / Креатор (Робота + ШІ + Зв'язок)</option>
+        <option value="social_media">📱 Соціальна бульбашка (Месенджери + Соцмережі + Медіа)</option>
+        <option value="daily_fintech">🛒 Сім'янин / Побут / Фінтех / Покупки / Місто</option>
+        <option value="gamer">🎮 Геймер / Стрімер / Віртуальні світи</option>
+      </select>
+
+      <input type="text" class="search-input" id="brand-search" placeholder="🔍 Пошук бренду (напр. Дія, WeChat, Steam, TikTok)..." />
+
+      <div class="dedup-note">
+        ✓ <b>Без задвоєнь:</b> франшизи та ребрендинги об'єднані в один вузол (напр. <i>TikTok/Douyin</i>, <i>UMC→МТС→Vodafone</i>, <i>Slando→OLX</i>, <i>Glovo/DeliveryHero</i>, <i>Twitter→X</i>, <i>Taobao/AliExpress</i>, <i>Pinduoduo/Temu</i>).
+      </div>
+    </div>
+
+    <!-- Блок 2: Метрики на обраний рік -->
+    <div class="glass-panel">
+      <span class="era-badge" id="era-badge">2022–2026 • 5G та AI-Кокон</span>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">Брендів у профілі</div>
+          <div class="metric-value" id="stat-brands">247</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Акаунтів / Підписок</div>
+          <div class="metric-value" id="stat-accounts">185</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Екранний час</div>
+          <div class="metric-value" id="stat-screentime">9.5 год</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Сповіщень / день</div>
+          <div class="metric-value" id="stat-notifs">240</div>
+        </div>
+      </div>
+
+      <div class="blinders-meter">
+        <div class="meter-header">
+          <span>Індекс «Зашореності» (Кокон уваги)</span>
+          <span id="stat-blinders-pct" style="color: #f43f5e;">96%</span>
+        </div>
+        <div class="meter-bar-bg">
+          <div class="meter-bar-fill" id="blinders-bar"></div>
+        </div>
+      </div>
+
+      <div class="era-description" id="era-desc">
+        Опис епохи...
+      </div>
+    </div>
+
+    <!-- Блок 3: Налаштування 3D-візуалізації -->
+    <div class="glass-panel">
+      <div class="legend-title">Керування Ілюзією Зашореності</div>
+      <div class="control-row">
+        <label>
+          <span>Щільність стиснення сфери:</span>
+          <span id="squeeze-val">100%</span>
+        </label>
+        <input type="range" id="squeeze-slider" min="0.4" max="2.2" step="0.05" value="1.0" />
+      </div>
+      <div class="control-row">
+        <label>
+          <span>Масштаб іконок брендів:</span>
+          <span id="scale-val">100%</span>
+        </label>
+        <input type="range" id="scale-slider" min="0.4" max="2.0" step="0.05" value="1.0" />
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-tethers" checked />
+        <span>Нитки прив'язки уваги до голови</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-shell" checked />
+        <span>Напівпрозора куля інформаційної бульбашки</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-badges" checked />
+        <span>Червоні індикатори сповіщень (+99)</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chk-captions" />
+        <span>Підписи назв та року поверх логотипу</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Права легенда категорій -->
+  <div class="glass-panel legend-panel">
+    <div class="legend-title">
+      <span>Категорії (Клік — фільтр)</span>
+      <span id="reset-cat-btn" style="color:var(--accent);cursor:pointer;display:none;" onclick="setCategoryFilter(null)">Усі ✕</span>
+    </div>
+    <div id="category-list"></div>
+    <div class="hint-pill">🖱️ ЛКМ — обертати • Колесо — зум<br/>ПКМ — панорама • Наведіть на бренд</div>
+  </div>
+
+  <!-- Нижня панель часу -->
+  <div class="glass-panel bottom-timeline">
+    <div class="timeline-controls">
+      <button class="play-btn" id="btn-play" onclick="togglePlay()">▶ Авто-еволюція</button>
+      <div class="year-display" id="year-label">2026</div>
+      <div class="slider-wrapper">
+        <input type="range" id="year-slider" min="1975" max="2026" step="1" value="2026" />
+        <div class="decade-ticks">
+          <span onclick="jumpToYear(1975)">1975 (1G / Аналог)</span>
+          <span onclick="jumpToYear(1985)">1985 (ПК / Пейджер)</span>
+          <span onclick="jumpToYear(1998)">1998 (2G GSM / Веб 1.0)</span>
+          <span onclick="jumpToYear(2008)">2008 (3G / Смартфони)</span>
+          <span onclick="jumpToYear(2016)">2016 (4G / Супераппи)</span>
+          <span onclick="jumpToYear(2026)">2026 (5G / AI-Кокон)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Тултіп бренду -->
+  <div id="brand-tooltip">
+    <div class="tt-header">
+      <div class="tt-icon" id="tt-icon"></div>
+      <div>
+        <div class="tt-title" id="tt-title">Google</div>
+        <div class="tt-year" id="tt-year">1998 • Пошук та Екосистема</div>
+        <div class="tt-regions" id="tt-regions">🌍 Глобальний</div>
+      </div>
+    </div>
+    <div class="tt-desc" id="tt-desc">Опис сервісу</div>
+    <div class="tt-drain" id="tt-drain">Увага: Високий вплив</div>
+  </div>
+
+  <!-- Three.js + OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <script>
+    // ============================================================================
+    // 1. КАТЕГОРІЇ ТА ПОВНА ДЕДУПЛІКОВАНА БАЗА СЕРВІСІВ УСІХ КРАЇН (1975 - 2026)
+    // ============================================================================
+    const CATEGORIES = {
+      telecom: { name: 'Зв’язок і Месенджери', color: '#38bdf8' },
+      media:   { name: 'Медіа, Відео та Музика', color: '#f43f5e' },
+      social:  { name: 'Соцмережі та Дейтинг', color: '#a855f7' },
+      work:    { name: 'Робота, ІТ, Хмари та Пошук', color: '#3b82f6' },
+      fintech: { name: 'Фінтех, Покупки, Місто, Дія', color: '#10b981' },
+      ai:      { name: 'ШІ, Ігри та Гаджети', color: '#f59e0b' }
+    };
+
+    const REGION_LABELS = {
+      global: '🌍 Глобальний',
+      ua: '🇺🇦 Україна',
+      west: '🇪🇺🇺🇸 Захід',
+      asia: '🌏 Азія',
+      latam_mena: '🌎 ЛатАм/MENA/Африка'
+    };
+
+    const SERVICES = [
+      {
+            "name": "Motorola (1G DynaTAC)",
+            "symbol": "M",
+            "slug": "motorola",
+            "year": 1975,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#00529B",
+            "drain": 2,
+            "desc": "Перші стільникові телефони Motorola DynaTAC та мережі 1G."
+      },
+      {
+            "name": "Стаціонарний телефон (ПТС)",
+            "symbol": "☎",
+            "slug": "",
+            "year": 1975,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0284c7",
+            "drain": 1,
+            "desc": "Дротова телефонія (Укртелеком / AT&T / BT / NTT) — єдиний голосовий канал 70-х."
+      },
+      {
+            "name": "Ефірне Телебачення",
+            "symbol": "TV",
+            "slug": "",
+            "year": 1975,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#e11d48",
+            "drain": 4,
+            "desc": "Аналогове телебачення за розкладом — головний вечірній екран сім'ї."
+      },
+      {
+            "name": "FM / AM Радіо",
+            "symbol": "FM",
+            "slug": "",
+            "year": 1975,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#f43f5e",
+            "drain": 2,
+            "desc": "Аналогове радіомовлення вдома, на роботі та в авто."
+      },
+      {
+            "name": "Паперова Пошта / Телеграф",
+            "symbol": "✉",
+            "slug": "",
+            "year": 1975,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#64748b",
+            "drain": 1,
+            "desc": "Класична державна пошта (Укрпошта / USPS / Deutsche Post / Japan Post), листи та квитанції."
+      },
+      {
+            "name": "Teletext (Ceefax)",
+            "symbol": "TXT",
+            "slug": "",
+            "year": 1976,
+            "cat": "media",
+            "regions": [
+                  "west",
+                  "ua"
+            ],
+            "color": "#16a34a",
+            "drain": 3,
+            "desc": "Текстові сторінки новин, погоди, телепрограми та курсів валют просто на екрані телевізора."
+      },
+      {
+            "name": "SWIFT / Банкомати (ATM)",
+            "symbol": "ATM",
+            "slug": "",
+            "year": 1977,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0369a1",
+            "drain": 2,
+            "desc": "Глобальна міжбанківська мережа SWIFT та поява вуличних банкоматів."
+      },
+      {
+            "name": "Atari (Аркадні консолі)",
+            "symbol": "AT",
+            "slug": "atari",
+            "year": 1977,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#E4002B",
+            "drain": 3,
+            "desc": "Atari 2600 — поява домашніх відеоігор на екрані телевізора."
+      },
+      {
+            "name": "Apple II / Macintosh",
+            "symbol": "",
+            "slug": "apple",
+            "year": 1977,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#1e293b",
+            "drain": 3,
+            "desc": "Персональні комп'ютери Apple та графічний інтерфейс користувача."
+      },
+      {
+            "name": "Sony Walkman / Discman",
+            "symbol": "W",
+            "slug": "sony",
+            "year": 1979,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#ea580c",
+            "drain": 4,
+            "desc": "Перший портативний касетний та CD-плеєр: поява людини в навушниках, ізольованої від вулиці."
+      },
+      {
+            "name": "CompuServe / Prodigy",
+            "symbol": "CS",
+            "slug": "",
+            "year": 1979,
+            "cat": "work",
+            "regions": [
+                  "west"
+            ],
+            "color": "#4f46e5",
+            "drain": 2,
+            "desc": "Перші комерційні онлайн-сервіси через модем у США."
+      },
+      {
+            "name": "Usenet (Newsgroups)",
+            "symbol": "USE",
+            "slug": "",
+            "year": 1980,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#475569",
+            "drain": 3,
+            "desc": "Всесвітня розподілена мережа текстових дискусійних груп — пращур форумів і Reddit."
+      },
+      {
+            "name": "Visa",
+            "symbol": "VISA",
+            "slug": "visa",
+            "year": 1980,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#1A1F71",
+            "drain": 2,
+            "desc": "Міжнародна платіжна система банківських карток."
+      },
+      {
+            "name": "Mastercard",
+            "symbol": "MC",
+            "slug": "mastercard",
+            "year": 1980,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#EB001B",
+            "drain": 2,
+            "desc": "Глобальна карткова платіжна мережа (Eurocard / MasterCharge)."
+      },
+      {
+            "name": "CNN (Новини 24/7)",
+            "symbol": "CNN",
+            "slug": "cnn",
+            "year": 1980,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#CC0000",
+            "drain": 5,
+            "desc": "Поява концепції цілодобового новинного телеканалу без перерви."
+      },
+      {
+            "name": "MTV",
+            "symbol": "MTV",
+            "slug": "",
+            "year": 1981,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#eab308",
+            "drain": 5,
+            "desc": "Музичне телебачення, що сформувало кліповий темп візуальної культури."
+      },
+      {
+            "name": "Пейджер (Beeper)",
+            "symbol": "PG",
+            "slug": "",
+            "year": 1982,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#06b6d4",
+            "drain": 4,
+            "desc": "Персональний радіопейджер на поясі — перші миттєві текстові/цифрові виклики."
+      },
+      {
+            "name": "Minitel",
+            "symbol": "MT",
+            "slug": "",
+            "year": 1982,
+            "cat": "work",
+            "regions": [
+                  "west"
+            ],
+            "color": "#b45309",
+            "drain": 3,
+            "desc": "Французька до-інтернетна мережа терміналів для купівлі квитків, банкінгу та чатів."
+      },
+      {
+            "name": "Bloomberg Terminal",
+            "symbol": "BBG",
+            "slug": "",
+            "year": 1982,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#000000",
+            "drain": 6,
+            "desc": "Фінансові термінали реального часу — багатомоніторна зашореність трейдерів."
+      },
+      {
+            "name": "Nintendo (NES / GameBoy / Switch)",
+            "symbol": "N",
+            "slug": "nintendo",
+            "year": 1983,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#E60012",
+            "drain": 5,
+            "desc": "Ігрова екосистема Nintendo (від Famicom/NES та кишенькового GameBoy до Switch)."
+      },
+      {
+            "name": "Casio (Цифрові годинники / Органайзери)",
+            "symbol": "CSO",
+            "slug": "casio",
+            "year": 1983,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#003087",
+            "drain": 2,
+            "desc": "Перші наручні цифрові екрани з будильником, секундоміром і телефонною книгою."
+      },
+      {
+            "name": "FidoNet / BBS",
+            "symbol": "FIDO",
+            "slug": "",
+            "year": 1984,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#16a34a",
+            "drain": 4,
+            "desc": "Некомерційна модемна мережа ехоконференцій та спілкування ентузіастів."
+      },
+      {
+            "name": "IBM PC / Dell / HP (Офісні ПК)",
+            "symbol": "PC",
+            "slug": "dell",
+            "year": 1984,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#007DB8",
+            "drain": 3,
+            "desc": "Масові домашні та офісні персональні комп'ютери архітектури x86."
+      },
+      {
+            "name": "Microsoft Windows & Office",
+            "symbol": "MS",
+            "slug": "microsoft",
+            "year": 1985,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#00A4EF",
+            "drain": 6,
+            "desc": "Операційна система Windows та пакет Word/Excel/PowerPoint — основа офісної роботи."
+      },
+      {
+            "name": "AOL (America Online / AIM)",
+            "symbol": "AOL",
+            "slug": "aol",
+            "year": 1985,
+            "cat": "telecom",
+            "regions": [
+                  "west"
+            ],
+            "color": "#2563eb",
+            "drain": 5,
+            "desc": "Головний dial-up провайдер США, пошта та месенджер AIM («You've got mail!»)."
+      },
+      {
+            "name": "SEGA",
+            "symbol": "SG",
+            "slug": "sega",
+            "year": 1988,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0089CF",
+            "drain": 4,
+            "desc": "Консолі Sega Mega Drive / Genesis та аркадні ігри."
+      },
+      {
+            "name": "Garmin (GPS-навігатори)",
+            "symbol": "GPS",
+            "slug": "garmin",
+            "year": 1989,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#007CC3",
+            "drain": 3,
+            "desc": "Супутникові навігатори для авто, авіації та спортивні смарт-годинники."
+      },
+      {
+            "name": "Adobe (Photoshop / Creative Cloud)",
+            "symbol": "Ps",
+            "slug": "adobephotoshop",
+            "year": 1990,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#31A8FF",
+            "drain": 5,
+            "desc": "Індустріальний стандарт обробки графіки, PDF, фото та відеомонтажу."
+      },
+      {
+            "name": "IMDb",
+            "symbol": "IMDb",
+            "slug": "imdb",
+            "year": 1990,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#F5C518",
+            "drain": 2,
+            "desc": "Найбільша у світі база даних кінофільмів, серіалів та рейтингів."
+      },
+      {
+            "name": "Linux (Ubuntu / Debian / OpenSource)",
+            "symbol": "🐧",
+            "slug": "linux",
+            "year": 1991,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#FCC624",
+            "drain": 4,
+            "desc": "Ядро Linux та екосистема вільного програмного забезпечення і серверів."
+      },
+      {
+            "name": "2G GSM & SMS",
+            "symbol": "SMS",
+            "slug": "",
+            "year": 1992,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0284c7",
+            "drain": 5,
+            "desc": "Цифровий стільниковий стандарт 2G та служба коротких текстових повідомлень SMS."
+      },
+      {
+            "name": "ПриватБанк / Приват24",
+            "symbol": "П24",
+            "slug": "",
+            "year": 1992,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#56B847",
+            "drain": 6,
+            "desc": "Найбільша банківська екосистема України (картки, термінали самообслуговування та Приват24)."
+      },
+      {
+            "name": "Vodafone (екс-UMC / МТС)",
+            "symbol": "VF",
+            "slug": "vodafone",
+            "year": 1992,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#E60000",
+            "drain": 4,
+            "desc": "Єдиний телеком-гігант (в Україні почався як UMC у 1992 р., згодом МТС, нині Vodafone)."
+      },
+      {
+            "name": "WWW / Netscape / Ранні браузери",
+            "symbol": "WWW",
+            "slug": "",
+            "year": 1993,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0d9488",
+            "drain": 5,
+            "desc": "Поява гіпертекстових сайтів World Wide Web та перших графічних браузерів Mosaic/Netscape."
+      },
+      {
+            "name": "Electronic Arts (EA Sports / Origin)",
+            "symbol": "EA",
+            "slug": "ea",
+            "year": 1993,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#FF4747",
+            "drain": 5,
+            "desc": "Серії FIFA (EA FC), Need for Speed, The Sims та Battlefield."
+      },
+      {
+            "name": "Nokia Mobile",
+            "symbol": "NK",
+            "slug": "nokia",
+            "year": 1994,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#124191",
+            "drain": 4,
+            "desc": "Легендарні мобільні телефони Nokia (3310, Symbian-смартфони) та гра «Змійка»."
+      },
+      {
+            "name": "Yahoo! (Yahoo! Japan)",
+            "symbol": "Y!",
+            "slug": "yahoo",
+            "year": 1994,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#6001D2",
+            "drain": 4,
+            "desc": "Перший масовий інтернет-портал, каталог сайтів, пошта та фінанси."
+      },
+      {
+            "name": "Sony PlayStation (PSN)",
+            "symbol": "PS",
+            "slug": "playstation",
+            "year": 1994,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#003791",
+            "drain": 6,
+            "desc": "Ігрові консолі PlayStation (PS1–PS5) та мережевий сервіс PlayStation Network."
+      },
+      {
+            "name": "Amazon (AWS / Kindle / Prime)",
+            "symbol": "az",
+            "slug": "amazon",
+            "year": 1994,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#FF9900",
+            "drain": 6,
+            "desc": "Глобальний гігант електронної комерції, читалок Kindle, доставки Prime та хмар AWS."
+      },
+      {
+            "name": "eBay",
+            "symbol": "eB",
+            "slug": "ebay",
+            "year": 1995,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#0064D2",
+            "drain": 4,
+            "desc": "Глобальна платформа інтернет-аукціонів та C2C-торгівлі."
+      },
+      {
+            "name": "mIRC (IRC-чати)",
+            "symbol": "IRC",
+            "slug": "",
+            "year": 1995,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#dc2626",
+            "drain": 5,
+            "desc": "Текстові канали IRC — перше масове нічне онлайн-спілкування в чатах."
+      },
+      {
+            "name": "Craigslist",
+            "symbol": "CL",
+            "slug": "",
+            "year": 1995,
+            "cat": "fintech",
+            "regions": [
+                  "west"
+            ],
+            "color": "#5b21b6",
+            "drain": 3,
+            "desc": "Класична американська дошка оголошень про роботу, житло та послуги."
+      },
+      {
+            "name": "Opera / Opera Mini",
+            "symbol": "O",
+            "slug": "opera",
+            "year": 1995,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF1B2D",
+            "drain": 5,
+            "desc": "Веб-браузер Opera та культова Opera Mini, що стискала трафік на кнопкових телефонах."
+      },
+      {
+            "name": "Match.com (Ранній дейтинг)",
+            "symbol": "♥",
+            "slug": "",
+            "year": 1995,
+            "cat": "social",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#e11d48",
+            "drain": 3,
+            "desc": "Перший великий веб-сайт романтичних анкет і знайомств."
+      },
+      {
+            "name": "Booking.com (Priceline / Agoda)",
+            "symbol": "B.",
+            "slug": "bookingdotcom",
+            "year": 1996,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#003580",
+            "drain": 3,
+            "desc": "Єдина світова група онлайн-бронювання готелів та апартаментів (Booking Holdings: Booking + Agoda)."
+      },
+      {
+            "name": "ICQ («Аська» / QIP)",
+            "symbol": "ICQ",
+            "slug": "",
+            "year": 1996,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#22c55e",
+            "drain": 7,
+            "desc": "Перший масовий інтернет-месенджер з номерами UIN, статусами «У мережі» та звуком «О-оу!»."
+      },
+      {
+            "name": "Hotmail / Outlook",
+            "symbol": "@",
+            "slug": "microsoftoutlook",
+            "year": 1996,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#0078D4",
+            "drain": 5,
+            "desc": "Веб-пошта та календар Microsoft (від Hotmail 1996 р. до сучасного корпоративного Outlook)."
+      },
+      {
+            "name": "Blizzard Battle.net",
+            "symbol": "Bnet",
+            "slug": "battledotnet",
+            "year": 1996,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#00AEFF",
+            "drain": 7,
+            "desc": "Ігрова мережа Diablo, StarCraft, Warcraft (WoW) та Overwatch."
+      },
+      {
+            "name": "iHerb",
+            "symbol": "iH",
+            "slug": "",
+            "year": 1996,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#458500",
+            "drain": 3,
+            "desc": "Глобальний онлайн-магазин вітамінів, БАДів та органічних товарів."
+      },
+      {
+            "name": "Winamp / Nero / WinRAR (Утиліти ПК)",
+            "symbol": "⚡",
+            "slug": "",
+            "year": 1997,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#f59e0b",
+            "drain": 4,
+            "desc": "Культовий MP3-плеєр Winamp, запис CD-дисків Nero та архіватор WinRAR."
+      },
+      {
+            "name": "Антивіруси (Norton / Avast / ESET)",
+            "symbol": "🛡",
+            "slug": "",
+            "year": 1997,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#eab308",
+            "drain": 3,
+            "desc": "Постійні спливаючі бази вірусних сигнатур та сканування системи."
+      },
+      {
+            "name": "Київстар (екс-Beeline UA / Djuice)",
+            "symbol": "КС",
+            "slug": "",
+            "year": 1997,
+            "cat": "telecom",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#00A0FF",
+            "drain": 4,
+            "desc": "Найбільший оператор мобільного зв'язку та домашнього інтернету в Україні."
+      },
+      {
+            "name": "Netflix",
+            "symbol": "N",
+            "slug": "netflix",
+            "year": 1997,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#E50914",
+            "drain": 8,
+            "desc": "Світовий лідер відеострімінгу серіалів і кіно (культура binge-watching)."
+      },
+      {
+            "name": "Rakuten (Viki / Kobo)",
+            "symbol": "R",
+            "slug": "rakuten",
+            "year": 1997,
+            "cat": "fintech",
+            "regions": [
+                  "asia",
+                  "west"
+            ],
+            "color": "#BF0000",
+            "drain": 4,
+            "desc": "Японська екосистема маркетплейсів, банкінгу та цифрових сервісів."
+      },
+      {
+            "name": "Google Search",
+            "symbol": "G",
+            "slug": "google",
+            "year": 1998,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#4285F4",
+            "drain": 8,
+            "desc": "Головна пошукова система планети та єдиний обліковий запис Google."
+      },
+      {
+            "name": "PayPal",
+            "symbol": "PP",
+            "slug": "paypal",
+            "year": 1998,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#003087",
+            "drain": 4,
+            "desc": "Міжнародна система електронних платежів та захисту онлайн-покупок."
+      },
+      {
+            "name": "Tencent QQ",
+            "symbol": "QQ",
+            "slug": "tencentqq",
+            "year": 1999,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#12B7F5",
+            "drain": 7,
+            "desc": "Легендарний китайський месенджер, ігровий та соціальний портал з іконкою пінгвіна."
+      },
+      {
+            "name": "Cyworld",
+            "symbol": "CY",
+            "slug": "",
+            "year": 1999,
+            "cat": "social",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#f97316",
+            "drain": 6,
+            "desc": "Південнокорейський піонер соцмереж з віртуальними кімнатами (minihompy) та цифровою валютою."
+      },
+      {
+            "name": "Alibaba / Taobao / AliExpress",
+            "symbol": "Ali",
+            "slug": "aliexpress",
+            "year": 1999,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF4747",
+            "drain": 6,
+            "desc": "Єдина торгова імперія Alibaba Group (Taobao/Tmall в Китаї, AliExpress глобально — без задвоєння)."
+      },
+      {
+            "name": "Naver",
+            "symbol": "N",
+            "slug": "naver",
+            "year": 1999,
+            "cat": "work",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#03C75A",
+            "drain": 7,
+            "desc": "Головний пошуковий портал, карти, блоги, вебтуни та екосистема Південної Кореї."
+      },
+      {
+            "name": "NTT Docomo i-mode",
+            "symbol": "i",
+            "slug": "",
+            "year": 1999,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#cc0033",
+            "drain": 6,
+            "desc": "Перша у світі екосистема мобільного інтернету, емодзі та мобільних гаманців у Японії."
+      },
+      {
+            "name": "Mercado Libre (Mercado Pago)",
+            "symbol": "ML",
+            "slug": "mercadolibre",
+            "year": 1999,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#FFE600",
+            "drain": 6,
+            "desc": "Найбільший маркетплейс і фінтех-екосистема Латинської Америки (Аргентина, Бразилія, Мексика)."
+      },
+      {
+            "name": "LiveJournal (ЖЖ / Blogger)",
+            "symbol": "LJ",
+            "slug": "livejournal",
+            "year": 1999,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#00B0EA",
+            "drain": 5,
+            "desc": "Епоха розлогих текстових інтернет-щоденників та багатогодинних дискусій у коментарях."
+      },
+      {
+            "name": "Napster / eMule (P2P-музика)",
+            "symbol": "MP3",
+            "slug": "",
+            "year": 1999,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#eab308",
+            "drain": 4,
+            "desc": "Піринговий обмін MP3-файлами, що відкрив епоху домашніх музичних бібліотек."
+      },
+      {
+            "name": "BlackBerry (BBM)",
+            "symbol": "BB",
+            "slug": "blackberry",
+            "year": 1999,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#1e293b",
+            "drain": 6,
+            "desc": "Корпоративні комунікатори з QWERTY-клавіатурою (прив'язка менеджера до пошти 24/7)."
+      },
+      {
+            "name": "Salesforce CRM",
+            "symbol": "SF",
+            "slug": "salesforce",
+            "year": 1999,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#00A1E0",
+            "drain": 5,
+            "desc": "Перша хмарна CRM-система (SaaS), де оцифровується кожен контакт із клієнтом."
+      },
+      {
+            "name": "Baidu",
+            "symbol": "🐾",
+            "slug": "baidu",
+            "year": 2000,
+            "cat": "work",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#2932E1",
+            "drain": 7,
+            "desc": "Домінуюча пошукова система, карти, енциклопедія та хмарна екосистема Китаю."
+      },
+      {
+            "name": "TripAdvisor",
+            "symbol": "🦉",
+            "slug": "tripadvisor",
+            "year": 2000,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#34E0A1",
+            "drain": 3,
+            "desc": "Світова база відгуків мандрівників про готелі, ресторани та пам'ятки."
+      },
+      {
+            "name": "DeviantArt / ArtStation",
+            "symbol": "DA",
+            "slug": "deviantart",
+            "year": 2000,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#05CC47",
+            "drain": 4,
+            "desc": "Найбільші онлайн-галереї та спільноти цифрових художників та ілюстраторів."
+      },
+      {
+            "name": "Українська Правда / Новинні портали",
+            "symbol": "УП",
+            "slug": "",
+            "year": 2000,
+            "cat": "media",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#991b1b",
+            "drain": 6,
+            "desc": "Зародження українських онлайн-ЗМІ та звички постійно оновлювати стрічку новин."
+      },
+      {
+            "name": "Wikipedia",
+            "symbol": "W",
+            "slug": "wikipedia",
+            "year": 2001,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#64748b",
+            "drain": 4,
+            "desc": "Вільна багатомовна онлайн-енциклопедія людства."
+      },
+      {
+            "name": "Apple iTunes / Apple Music",
+            "symbol": "♫",
+            "slug": "applemusic",
+            "year": 2001,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FA243C",
+            "drain": 5,
+            "desc": "Музична екосистема Apple (від iPod та iTunes Store до сучасного Apple Music)."
+      },
+      {
+            "name": "BitTorrent (uTorrent)",
+            "symbol": "µT",
+            "slug": "utorrent",
+            "year": 2001,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#22c55e",
+            "drain": 4,
+            "desc": "Протокол торент-трекерів — головний канал обміну фільмами та іграми у 2000-х."
+      },
+      {
+            "name": "TeamSpeak (Ventrilo / Mumble)",
+            "symbol": "TS",
+            "slug": "teamspeak",
+            "year": 2001,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#2563eb",
+            "drain": 5,
+            "desc": "Голосовий зв'язок для рейдів, кланів та кіберспорту до появи Discord."
+      },
+      {
+            "name": "Нова Пошта (Nova Post)",
+            "symbol": "НП",
+            "slug": "",
+            "year": 2001,
+            "cat": "fintech",
+            "regions": [
+                  "ua",
+                  "west"
+            ],
+            "color": "#E30613",
+            "drain": 5,
+            "desc": "Експрес-логістика України та Європи: мобільний додаток з трекінгом посилок і поштоматами."
+      },
+      {
+            "name": "LinkedIn",
+            "symbol": "in",
+            "slug": "linkedin",
+            "year": 2002,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0A66C2",
+            "drain": 5,
+            "desc": "Соціальна мережа ділових контактів, резюме та корпоративної самопрезентації."
+      },
+      {
+            "name": "Moodle / Google Classroom (LMS)",
+            "symbol": "Mdl",
+            "slug": "moodle",
+            "year": 2002,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#F98012",
+            "drain": 4,
+            "desc": "Системи дистанційного навчання університетів і шкіл з дедлайнами та тестами."
+      },
+      {
+            "name": "Last.fm",
+            "symbol": "as",
+            "slug": "lastdotfm",
+            "year": 2002,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#D51007",
+            "drain": 3,
+            "desc": "Скробблінг прослуханої музики та перші алгоритмічні рекомендації за смаком."
+      },
+      {
+            "name": "Xbox Live / Game Pass",
+            "symbol": "X",
+            "slug": "xbox",
+            "year": 2002,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#107C10",
+            "drain": 6,
+            "desc": "Ігрова онлайн-мережа, досягнення (Achievements) та підписка Microsoft Xbox."
+      },
+      {
+            "name": "Shazam",
+            "symbol": "S",
+            "slug": "shazam",
+            "year": 2002,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0088FF",
+            "drain": 2,
+            "desc": "Миттєве розпізнавання музики, що грає навколо."
+      },
+      {
+            "name": "Jira / Atlassian (Confluence)",
+            "symbol": "J",
+            "slug": "jira",
+            "year": 2002,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0052CC",
+            "drain": 6,
+            "desc": "Система трекінгу задач і спринтів, що перетворила інтелектуальну працю на конвеєр тікетів."
+      },
+      {
+            "name": "Skype",
+            "symbol": "S",
+            "slug": "skype",
+            "year": 2003,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#00AFF0",
+            "drain": 6,
+            "desc": "Революція безкоштовних голосових та відеодзвінків через інтернет."
+      },
+      {
+            "name": "Steam (Valve)",
+            "symbol": "ST",
+            "slug": "steam",
+            "year": 2003,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#171a21",
+            "drain": 7,
+            "desc": "Головна платформа цифрової дистрибуції ПК-ігор, розпродажів та спільнот."
+      },
+      {
+            "name": "MySpace",
+            "symbol": "MS",
+            "slug": "myspace",
+            "year": 2003,
+            "cat": "social",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#003399",
+            "drain": 5,
+            "desc": "Перша глобальна соціальна мережа з кастомізацією профілів та музикою."
+      },
+      {
+            "name": "Second Life / Habbo",
+            "symbol": "SL",
+            "slug": "",
+            "year": 2003,
+            "cat": "ai",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#06b6d4",
+            "drain": 5,
+            "desc": "Перші тривимірні віртуальні світи з власною економікою та аватарами."
+      },
+      {
+            "name": "Upwork (екс-oDesk / Elance / Fiverr)",
+            "symbol": "Up",
+            "slug": "upwork",
+            "year": 2003,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#14A800",
+            "drain": 6,
+            "desc": "Глобальні біржі фрілансу з трекерами робочого екрана (Time Tracker)."
+      },
+      {
+            "name": "Skyscanner / Kayak / Aviasales",
+            "symbol": "✈",
+            "slug": "skyscanner",
+            "year": 2003,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0770E3",
+            "drain": 3,
+            "desc": "Метапошуковики дешевих авіаквитків та сповіщень про зміну цін на перельоти."
+      },
+      {
+            "name": "WordPress",
+            "symbol": "W",
+            "slug": "wordpress",
+            "year": 2003,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#21759B",
+            "drain": 3,
+            "desc": "Система керування контентом, на якій працює понад 40% сайтів світу."
+      },
+      {
+            "name": "Alipay (Ant Group)",
+            "symbol": "支",
+            "slug": "alipay",
+            "year": 2004,
+            "cat": "fintech",
+            "regions": [
+                  "asia",
+                  "global"
+            ],
+            "color": "#1677FF",
+            "drain": 7,
+            "desc": "Китайський фінансовий суперапп QR-платежів, інвестицій, транспорту та державних послуг."
+      },
+      {
+            "name": "Facebook (Meta)",
+            "symbol": "f",
+            "slug": "facebook",
+            "year": 2004,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#1877F2",
+            "drain": 9,
+            "desc": "Найбільша соцмережа світу, що запровадила алгоритмічну стрічку новин та кнопку Like."
+      },
+      {
+            "name": "Gmail",
+            "symbol": "M",
+            "slug": "gmail",
+            "year": 2004,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#EA4335",
+            "drain": 6,
+            "desc": "Електронна пошта Google, що стала цифровим ідентифікатором для сотень сторонніх сервісів."
+      },
+      {
+            "name": "Mozilla Firefox",
+            "symbol": "🦊",
+            "slug": "firefox",
+            "year": 2004,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#FF7139",
+            "drain": 4,
+            "desc": "Вільний браузер з вкладками та розширеннями, що зламав монополію Internet Explorer."
+      },
+      {
+            "name": "Flickr",
+            "symbol": "●●",
+            "slug": "flickr",
+            "year": 2004,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#0063DC",
+            "drain": 3,
+            "desc": "Перший масштабний фотохостинг та спільнота фотографів."
+      },
+      {
+            "name": "Orkut",
+            "symbol": "O",
+            "slug": "",
+            "year": 2004,
+            "cat": "social",
+            "regions": [
+                  "latam_mena",
+                  "asia"
+            ],
+            "color": "#ED2590",
+            "drain": 6,
+            "desc": "Культова соцмережа від Google, що домінувала у Бразилії та Індії у 2000-х."
+      },
+      {
+            "name": "Mixi / Gree (Японські соцмережі)",
+            "symbol": "mx",
+            "slug": "",
+            "year": 2004,
+            "cat": "social",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#d97706",
+            "drain": 6,
+            "desc": "Перші мобільні соцмережі Японії та винахідники механіки gacha-монетизації."
+      },
+      {
+            "name": "Yelp",
+            "symbol": "Y*",
+            "slug": "yelp",
+            "year": 2004,
+            "cat": "fintech",
+            "regions": [
+                  "west"
+            ],
+            "color": "#FF1A1A",
+            "drain": 4,
+            "desc": "Платформа відгуків і рейтингів локальних закладів та сервісів у США і Європі."
+      },
+      {
+            "name": "World of Warcraft",
+            "symbol": "WoW",
+            "slug": "",
+            "year": 2004,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#f59e0b",
+            "drain": 8,
+            "desc": "Головна MMORPG світу, в якій мільйони людей проводили десятки годин щотижня."
+      },
+      {
+            "name": "Vimeo",
+            "symbol": "V",
+            "slug": "vimeo",
+            "year": 2004,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#1AB7EA",
+            "drain": 3,
+            "desc": "Платформа авторського, фестивального та професійного відео."
+      },
+      {
+            "name": "lifecell (екс-life:) / Astelit)",
+            "symbol": "lc",
+            "slug": "",
+            "year": 2005,
+            "cat": "telecom",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#FFC700",
+            "drain": 4,
+            "desc": "Третій національний мобільний оператор України (починався як life:) у 2005 році)."
+      },
+      {
+            "name": "Rozetka",
+            "symbol": "😊",
+            "slug": "",
+            "year": 2005,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#00A046",
+            "drain": 5,
+            "desc": "Найбільший український онлайн-ритейлер та маркетплейс («Щоразу що треба»)."
+      },
+      {
+            "name": "YouTube",
+            "symbol": "▶",
+            "slug": "youtube",
+            "year": 2005,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF0000",
+            "drain": 10,
+            "desc": "Головна відеоплатформа людства: від влогів і навчання до нескінченних YouTube Shorts."
+      },
+      {
+            "name": "Google Maps (Waze)",
+            "symbol": "📍",
+            "slug": "googlemaps",
+            "year": 2005,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#34A853",
+            "drain": 5,
+            "desc": "Супутникові карти, затори та GPS-навігація (включно з придбаним Waze — без дублювання)."
+      },
+      {
+            "name": "Reddit",
+            "symbol": "R",
+            "slug": "reddit",
+            "year": 2005,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF4500",
+            "drain": 7,
+            "desc": "Мережа тисяч тематичних спільнот (сабреддітів) та живих обговорень."
+      },
+      {
+            "name": "Etsy",
+            "symbol": "E",
+            "slug": "etsy",
+            "year": 2005,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#F1641E",
+            "drain": 3,
+            "desc": "Глобальний маркетплейс крафтових, вінтажних та авторських виробів."
+      },
+      {
+            "name": "Klarna / Afterpay (BNPL Розстрочка)",
+            "symbol": "K.",
+            "slug": "klarna",
+            "year": 2005,
+            "cat": "fintech",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#FFB3C7",
+            "drain": 4,
+            "desc": "Сервіси миттєвої купівлі в розстрочку «Купуй зараз — плати потім» (BNPL)."
+      },
+      {
+            "name": "Payoneer",
+            "symbol": "Payo",
+            "slug": "payoneer",
+            "year": 2005,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF4800",
+            "drain": 3,
+            "desc": "Міжнародна платіжна платформа для ІТ-контракторів, фрілансерів та селлерів."
+      },
+      {
+            "name": "DOU (Developers.org.ua)",
+            "symbol": "DOU",
+            "slug": "",
+            "year": 2005,
+            "cat": "work",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#1e293b",
+            "drain": 5,
+            "desc": "Головна спільнота, зарплатна аналітика та форуми українського ІТ-сектору."
+      },
+      {
+            "name": "X (екс-Twitter)",
+            "symbol": "X",
+            "slug": "x",
+            "year": 2006,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 9,
+            "desc": "Глобальний пульс термінових новин, трендів і думскролінгу (об'єднано Twitter + X без дублів)."
+      },
+      {
+            "name": "Spotify",
+            "symbol": "SP",
+            "slug": "spotify",
+            "year": 2006,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#1DB954",
+            "drain": 6,
+            "desc": "Музичний та подкаст-стрімінг з алгоритмічними плейлистами Discover Weekly."
+      },
+      {
+            "name": "OLX (екс-Slando / Letgo / Naspers)",
+            "symbol": "OLX",
+            "slug": "",
+            "year": 2006,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#002F34",
+            "drain": 5,
+            "desc": "Єдина мережа оголошень Prosus/Naspers (об'єднано Slando, OLX, Torg.alkar без задвоєння)."
+      },
+      {
+            "name": "Work.ua / Robota.ua",
+            "symbol": "W.ua",
+            "slug": "",
+            "year": 2006,
+            "cat": "work",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#0094FF",
+            "drain": 3,
+            "desc": "Провідні українські платформи пошуку роботи та кар'єрного моніторингу."
+      },
+      {
+            "name": "Roblox",
+            "symbol": "RBX",
+            "slug": "roblox",
+            "year": 2006,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 8,
+            "desc": "Метавсесвіт користувацьких ігор, де проводять час сотні мільйонів дітей та підлітків."
+      },
+      {
+            "name": "Google Docs / Drive / Workspace",
+            "symbol": "GD",
+            "slug": "googledrive",
+            "year": 2006,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#4285F4",
+            "drain": 6,
+            "desc": "Хмарні документи, таблиці, презентації та диск для спільної роботи онлайн."
+      },
+      {
+            "name": "Niconico (Nico Nico Douga)",
+            "symbol": "ニコ",
+            "slug": "niconico",
+            "year": 2006,
+            "cat": "media",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#252525",
+            "drain": 7,
+            "desc": "Культовий японський відеохостинг, що винайшов коментарі, які летять прямо поверх відео."
+      },
+      {
+            "name": "ВК / Однокласники (Історичний етап СНД)",
+            "symbol": "СНД",
+            "slug": "",
+            "year": 2006,
+            "cat": "social",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#475569",
+            "drain": 6,
+            "desc": "Історичний етап соцмереж 2006–2017 рр. у східноєвропейському сегменті до блокування та переходу в FB/TG/IG."
+      },
+      {
+            "name": "Apple iOS / App Store / iCloud",
+            "symbol": "",
+            "slug": "appstore",
+            "year": 2007,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0D96F6",
+            "drain": 9,
+            "desc": "Поява iPhone та магазину мобільних додатків App Store — народження смартфонної ери."
+      },
+      {
+            "name": "Dropbox",
+            "symbol": "DB",
+            "slug": "dropbox",
+            "year": 2007,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0061FF",
+            "drain": 3,
+            "desc": "Перше масове хмарне синхронізування файлів між усіма пристроями."
+      },
+      {
+            "name": "SoundCloud",
+            "symbol": "SC",
+            "slug": "soundcloud",
+            "year": 2007,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#FF5500",
+            "drain": 5,
+            "desc": "Аудіоплатформа незалежних музикантів, реміксів, DJ-сетів та подкастів."
+      },
+      {
+            "name": "Tumblr",
+            "symbol": "t",
+            "slug": "tumblr",
+            "year": 2007,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#36465D",
+            "drain": 6,
+            "desc": "Мікроблогінг візуальної естетики, фандомів та GIF-анімацій."
+      },
+      {
+            "name": "Goodreads / Yakaboo (Книги)",
+            "symbol": "📖",
+            "slug": "goodreads",
+            "year": 2007,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#372213",
+            "drain": 3,
+            "desc": "Соціальні каталоги прочитаних книг, рецензій та книжкових челенджів."
+      },
+      {
+            "name": "Hulu / Peacock (ТВ-стрімінги США)",
+            "symbol": "hulu",
+            "slug": "hulu",
+            "year": 2007,
+            "cat": "media",
+            "regions": [
+                  "west"
+            ],
+            "color": "#1CE783",
+            "drain": 6,
+            "desc": "Американські платформи потокового перегляду телешоу та серіалів."
+      },
+      {
+            "name": "M-Pesa",
+            "symbol": "M-P",
+            "slug": "",
+            "year": 2007,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#22c55e",
+            "drain": 5,
+            "desc": "Революційний мобільний банкінг через телефон без банківських відділень у Кенії та Африці."
+      },
+      {
+            "name": "Flipkart",
+            "symbol": "FK",
+            "slug": "flipkart",
+            "year": 2007,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#2874F0",
+            "drain": 5,
+            "desc": "Найбільший національний маркетплейс електронної комерції в Індії."
+      },
+      {
+            "name": "Deezer",
+            "symbol": "DZ",
+            "slug": "deezer",
+            "year": 2007,
+            "cat": "media",
+            "regions": [
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#A238FF",
+            "drain": 4,
+            "desc": "Французький та глобальний сервіс потокового аудіо."
+      },
+      {
+            "name": "Android / Google Play",
+            "symbol": "🤖",
+            "slug": "android",
+            "year": 2008,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#3DDC84",
+            "drain": 9,
+            "desc": "Найпоширеніша мобільна ОС світу та магазин додатків Google Play."
+      },
+      {
+            "name": "Google Chrome",
+            "symbol": "Cr",
+            "slug": "googlechrome",
+            "year": 2008,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#4285F4",
+            "drain": 7,
+            "desc": "Головний веб-браузер світу з синхронізацією паролів, історії та десятків відкритих вкладок."
+      },
+      {
+            "name": "Airbnb",
+            "symbol": "AB",
+            "slug": "airbnb",
+            "year": 2008,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF5A5F",
+            "drain": 4,
+            "desc": "Глобальна платформа короткострокової оренди житла та вражень під час подорожей."
+      },
+      {
+            "name": "GitHub (GitLab)",
+            "symbol": "GH",
+            "slug": "github",
+            "year": 2008,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#181717",
+            "drain": 6,
+            "desc": "Головна платформа хостингу коду, спільної розробки та зелених квадратиків комітів."
+      },
+      {
+            "name": "Stack Overflow",
+            "symbol": "SO",
+            "slug": "stackoverflow",
+            "year": 2008,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#F58025",
+            "drain": 5,
+            "desc": "База запитань і відповідей для інженерів та програмістів усього світу."
+      },
+      {
+            "name": "Evernote",
+            "symbol": "🐘",
+            "slug": "evernote",
+            "year": 2008,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#00A82D",
+            "drain": 4,
+            "desc": "Перший масовий хмарний блокнот для збереження нотаток, чеків та веб-сторінок."
+      },
+      {
+            "name": "Prom.ua (Satu / Bigl / EVO)",
+            "symbol": "Prom",
+            "slug": "",
+            "year": 2008,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#7E22CE",
+            "drain": 5,
+            "desc": "Найбільший український маркетплейс і конструктор інтернет-магазинів (група EVO)."
+      },
+      {
+            "name": "AUTO.RIA / DOM.RIA",
+            "symbol": "RIA",
+            "slug": "",
+            "year": 2008,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#dc2626",
+            "drain": 4,
+            "desc": "Головні українські маркетплейси перевірених авто та нерухомості."
+      },
+      {
+            "name": "WhatsApp",
+            "symbol": "WA",
+            "slug": "whatsapp",
+            "year": 2009,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#25D366",
+            "drain": 8,
+            "desc": "Найбільший мобільний месенджер світу за прив'язкою до телефонного номера."
+      },
+      {
+            "name": "Uber (+UberEats / Careem)",
+            "symbol": "Uber",
+            "slug": "uber",
+            "year": 2009,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 5,
+            "desc": "Глобальна платформа таксі та доставки їжі (включно з дочірнім Careem на Близькому Сході)."
+      },
+      {
+            "name": "Sina Weibo",
+            "symbol": "WB",
+            "slug": "sinaweibo",
+            "year": 2009,
+            "cat": "social",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#E6162D",
+            "drain": 8,
+            "desc": "Китайський гігант мікроблогінгу, новин, знаменитостей та гарячих трендів."
+      },
+      {
+            "name": "Minecraft",
+            "symbol": "MC",
+            "slug": "",
+            "year": 2009,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#16a34a",
+            "drain": 7,
+            "desc": "Найбільш продавана кубічна пісочниця в історії відеоігор."
+      },
+      {
+            "name": "League of Legends / Riot Games",
+            "symbol": "LoL",
+            "slug": "riotgames",
+            "year": 2009,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#D32936",
+            "drain": 8,
+            "desc": "Головна кіберспортивна дисципліна світу (League of Legends, Valorant, Teamfight Tactics)."
+      },
+      {
+            "name": "Strava",
+            "symbol": "STV",
+            "slug": "strava",
+            "year": 2009,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#FC4C02",
+            "drain": 5,
+            "desc": "Соціальна мережа для спортсменів, бігунів і велосипедистів з публікацією GPS-треків."
+      },
+      {
+            "name": "MyFitnessPal / Лічильники калорій",
+            "symbol": "kcal",
+            "slug": "",
+            "year": 2009,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#0066EE",
+            "drain": 4,
+            "desc": "Щоденне сканування штрихкодів їжі та підрахунок БЖВ і калорій у смартфоні."
+      },
+      {
+            "name": "Foursquare (Swarm)",
+            "symbol": "4sq",
+            "slug": "foursquare",
+            "year": 2009,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#F94877",
+            "drain": 4,
+            "desc": "Епоха гео-чекінів у закладах та змагання за бейдж «Мера» кав'ярні."
+      },
+      {
+            "name": "Bilibili",
+            "symbol": "Bili",
+            "slug": "bilibili",
+            "year": 2009,
+            "cat": "media",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#00A1D6",
+            "drain": 8,
+            "desc": "Провідна молодіжна відеоплатформа Китаю (аніме, геймінг, техно-огляди та живі коментарі)."
+      },
+      {
+            "name": "Venmo / Cash App / Zelle",
+            "symbol": "$",
+            "slug": "cashapp",
+            "year": 2009,
+            "cat": "fintech",
+            "regions": [
+                  "west"
+            ],
+            "color": "#00D632",
+            "drain": 4,
+            "desc": "Миттєві мобільні перекази між друзями у США із соціальною стрічкою оплат."
+      },
+      {
+            "name": "Instagram",
+            "symbol": "IG",
+            "slug": "instagram",
+            "year": 2010,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#E4405F",
+            "drain": 10,
+            "desc": "Візуальна соцмережа фото, Stories та Reels — головний генератор візуального порівняння та FOMO."
+      },
+      {
+            "name": "Viber (Rakuten Viber)",
+            "symbol": "VB",
+            "slug": "viber",
+            "year": 2010,
+            "cat": "telecom",
+            "regions": [
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#7360F2",
+            "drain": 7,
+            "desc": "Месенджер №1 для шкільних, будинкових, родинних і робочих чатів в Україні та Східній Європі."
+      },
+      {
+            "name": "Pinterest",
+            "symbol": "P",
+            "slug": "pinterest",
+            "year": 2010,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#BD081C",
+            "drain": 5,
+            "desc": "Візуальний пошук ідей, мудбордів, інтер'єрів та рецептів."
+      },
+      {
+            "name": "KakaoTalk (KakaoPay / Kakao T)",
+            "symbol": "TALK",
+            "slug": "kakaotalk",
+            "year": 2010,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#FFE812",
+            "drain": 9,
+            "desc": "Південнокорейський мега-суперапп (97% населення): чати, банк, таксі, подарунки та держпослуги."
+      },
+      {
+            "name": "Meituan (Dianping)",
+            "symbol": "美团",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#FFC300",
+            "drain": 7,
+            "desc": "Китайський гігант локальних послуг: доставка їжі, продуктів, готелі, квитки та відгуки."
+      },
+      {
+            "name": "iQIYI / Tencent Video / Youku",
+            "symbol": "iQ",
+            "slug": "iqiyi",
+            "year": 2010,
+            "cat": "media",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#00BE06",
+            "drain": 7,
+            "desc": "Китайські платформи довгого потокового відео, дорам, аніме та реаліті-шоу."
+      },
+      {
+            "name": "Zomato / Swiggy",
+            "symbol": "ZM",
+            "slug": "zomato",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#CB202D",
+            "drain": 6,
+            "desc": "Індійські супераппи доставки їжі, швидкої доставки продуктів за 10 хвилин (Blinkit) та ресторанів."
+      },
+      {
+            "name": "Ola Cabs",
+            "symbol": "OLA",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#3b82f6",
+            "drain": 5,
+            "desc": "Індійський сервіс виклику авто, мото-рикш та електроскутерів."
+      },
+      {
+            "name": "Xiaomi (Mi Home / Zepp Life)",
+            "symbol": "MI",
+            "slug": "xiaomi",
+            "year": 2010,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF6900",
+            "drain": 5,
+            "desc": "Екосистема смартфонів, фітнес-браслетів Mi Band, роботів-пилососів та розумного дому."
+      },
+      {
+            "name": "World of Tanks (Wargaming)",
+            "symbol": "WoT",
+            "slug": "",
+            "year": 2010,
+            "cat": "ai",
+            "regions": [
+                  "ua",
+                  "west",
+                  "global"
+            ],
+            "color": "#d97706",
+            "drain": 7,
+            "desc": "Масовий феномен мережевих танкових баталій у Східній та Центральній Європі."
+      },
+      {
+            "name": "Uklon",
+            "symbol": "UKL",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#FACC15",
+            "drain": 4,
+            "desc": "Перший український онлайн-сервіс виклику авто та доставки через мобільний додаток."
+      },
+      {
+            "name": "Kasta / Comfy / Алло / Епіцентр (Ритейл UA)",
+            "symbol": "UA🛒",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#ec4899",
+            "drain": 4,
+            "desc": "Додатки українських мереж електроніки, одягу та товарів для дому з бонусними картками."
+      },
+      {
+            "name": "Wizz Air / Ryanair (Додатки авіакомпаній)",
+            "symbol": "✈",
+            "slug": "ryanair",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "ua",
+                  "west"
+            ],
+            "color": "#073590",
+            "drain": 3,
+            "desc": "Мобільні додатки лоукостерів з онлайн-реєстрацією та посадковими QR-талонами."
+      },
+      {
+            "name": "Paytm",
+            "symbol": "Ptm",
+            "slug": "paytm",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#002E6E",
+            "drain": 6,
+            "desc": "Провідний мобільний гаманець, оплата рахунків та QR-платіжна система Індії."
+      },
+      {
+            "name": "Gojek (GoTo)",
+            "symbol": "GJ",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#00AA13",
+            "drain": 7,
+            "desc": "Індонезійський суперапп: мото-таксі, доставка їжі GoFood, кур'єри та фінтех GoPay."
+      },
+      {
+            "name": "Coupang",
+            "symbol": "CP",
+            "slug": "",
+            "year": 2010,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#E62E2D",
+            "drain": 6,
+            "desc": "Південнокорейський гігант e-commerce з нічною/ранковою доставкою Rocket Delivery."
+      },
+      {
+            "name": "Quora / Zhihu (Платформи Q&A)",
+            "symbol": "Q",
+            "slug": "quora",
+            "year": 2010,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#B92B27",
+            "drain": 4,
+            "desc": "Платформи розгорнутих експертних відповідей (Quora глобально, Zhihu у Китаї)."
+      },
+      {
+            "name": "WeChat (Weixin)",
+            "symbol": "WC",
+            "slug": "wechat",
+            "year": 2011,
+            "cat": "telecom",
+            "regions": [
+                  "asia",
+                  "global"
+            ],
+            "color": "#07C160",
+            "drain": 10,
+            "desc": "Китайський мега-суперапп (чати, стрічка Moments, WeChat Pay, держпослуги та мільйон Mini-Programs всередині)."
+      },
+      {
+            "name": "LINE",
+            "symbol": "LINE",
+            "slug": "line",
+            "year": 2011,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#00C300",
+            "drain": 9,
+            "desc": "Головний суперапп Японії, Тайваню та Таїланду (месенджер, стікери, LINE Pay, новини, таксі)."
+      },
+      {
+            "name": "Kuaishou (Kwai)",
+            "symbol": "Kwai",
+            "slug": "",
+            "year": 2011,
+            "cat": "media",
+            "regions": [
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF5000",
+            "drain": 8,
+            "desc": "Гігант коротких відео та лайв-стрім шопінгу в Китаї, Бразилії та Індонезії."
+      },
+      {
+            "name": "Snapchat",
+            "symbol": "👻",
+            "slug": "snapchat",
+            "year": 2011,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FFFC00",
+            "drain": 8,
+            "desc": "Зникаючі фото, AR-лінзи, карта друзів Snap Map та щоденні вогники Snapstreaks."
+      },
+      {
+            "name": "Twitch",
+            "symbol": "TW",
+            "slug": "twitch",
+            "year": 2011,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#9146FF",
+            "drain": 8,
+            "desc": "Платформа багатогодинних прямих трансляцій ігор, кіберспорту та IRL-стрімів."
+      },
+      {
+            "name": "Zoom",
+            "symbol": "ZM",
+            "slug": "zoom",
+            "year": 2011,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#0B5CFF",
+            "drain": 7,
+            "desc": "Хмарні відеоконференції, що перенесли офісні наради, школи й університети у вікна вебкамер."
+      },
+      {
+            "name": "Trello / Asana / Monday.com",
+            "symbol": "TR",
+            "slug": "trello",
+            "year": 2011,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#0052CC",
+            "drain": 5,
+            "desc": "Візуальні канбан-дошки та таск-трекери для робочих і особистих проєктів."
+      },
+      {
+            "name": "Miro",
+            "symbol": "Miro",
+            "slug": "miro",
+            "year": 2011,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#FFD02F",
+            "drain": 4,
+            "desc": "Нескінченні хмарні інтерактивні дошки для командних брейнштормів і схем."
+      },
+      {
+            "name": "Duolingo",
+            "symbol": "🦉",
+            "slug": "duolingo",
+            "year": 2011,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#58CC02",
+            "drain": 5,
+            "desc": "Гейміфіковане вивчення мов з наполегливими пушами про збереження ударного режиму (streak)."
+      },
+      {
+            "name": "Ajax Systems / Ring (Розумна безпека)",
+            "symbol": "AJAX",
+            "slug": "",
+            "year": 2011,
+            "cat": "ai",
+            "regions": [
+                  "ua",
+                  "west",
+                  "global"
+            ],
+            "color": "#0f172a",
+            "drain": 4,
+            "desc": "Українська система розумної охорони Ajax та відеодомофони Ring з миттєвими сповіщеннями про рух і тривогу."
+      },
+      {
+            "name": "Megogo / Sweet.tv / Київстар ТБ",
+            "symbol": "MGG",
+            "slug": "",
+            "year": 2011,
+            "cat": "media",
+            "regions": [
+                  "ua",
+                  "west"
+            ],
+            "color": "#111827",
+            "drain": 6,
+            "desc": "Українські ОТТ-медіасервіси телебачення, кіно, серіалів та спортивних трансляцій."
+      },
+      {
+            "name": "EasyWay (Транспорт онлайн)",
+            "symbol": "EW",
+            "slug": "",
+            "year": 2011,
+            "cat": "fintech",
+            "regions": [
+                  "ua",
+                  "west"
+            ],
+            "color": "#2563eb",
+            "drain": 3,
+            "desc": "GPS-моніторинг маршруток, трамваїв, тролейбусів та автобусів на карті міста в реальному часі."
+      },
+      {
+            "name": "Wise (екс-TransferWise)",
+            "symbol": "Wise",
+            "slug": "wise",
+            "year": 2011,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#9FE870",
+            "drain": 3,
+            "desc": "Міжнародні грошові перекази та мультивалютні рахунки."
+      },
+      {
+            "name": "Tinder (Badoo / Bumble / Hinge)",
+            "symbol": "🔥",
+            "slug": "tinder",
+            "year": 2012,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FE3C72",
+            "drain": 8,
+            "desc": "Дейтинг-додатки: гейміфікація романтичних знайомств через нескінченні свайпи анкет."
+      },
+      {
+            "name": "Coursera / Udemy / Prometheus",
+            "symbol": "EDU",
+            "slug": "coursera",
+            "year": 2012,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0056D2",
+            "drain": 4,
+            "desc": "Платформи масових відкритих онлайн-курсів (MOOC) та постійного перенавчання."
+      },
+      {
+            "name": "Medium",
+            "symbol": "M",
+            "slug": "medium",
+            "year": 2012,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#000000",
+            "drain": 4,
+            "desc": "Глобальна блог-платформа есеїв, ІТ-статей та авторських публікацій."
+      },
+      {
+            "name": "Calm / Headspace (Медитація & Сон)",
+            "symbol": "🧘",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#0284c7",
+            "drain": 3,
+            "desc": "Цифрові додатки для боротьби з тривожністю та безсонням, викликаними іншими додатками у смартфоні."
+      },
+      {
+            "name": "Grab",
+            "symbol": "Grab",
+            "slug": "grab",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#00B14F",
+            "drain": 7,
+            "desc": "Головний суперапп Південно-Східної Азії (Сінгапур, Таїланд, Малайзія, В'єтнам, Філіппіни)."
+      },
+      {
+            "name": "Zalo",
+            "symbol": "Zalo",
+            "slug": "zalo",
+            "year": 2012,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#0068FF",
+            "drain": 8,
+            "desc": "Національний месенджер та суперапп В'єтнаму (понад 75 млн щоденних користувачів)."
+      },
+      {
+            "name": "DiDi (DiDi Chuxing / 99)",
+            "symbol": "DiDi",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF7733",
+            "drain": 5,
+            "desc": "Гігант райдшерінгу та міської мобільності в Китаї, Бразилії (99) та Мексиці."
+      },
+      {
+            "name": "Jumia / Noon (Маркетплейси MENA & Африки)",
+            "symbol": "JM",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#f59e0b",
+            "drain": 5,
+            "desc": "Провідні екосистеми онлайн-торгівлі та доставки на Близькому Сході (Noon) та в Африці (Jumia)."
+      },
+      {
+            "name": "Anghami",
+            "symbol": "♫",
+            "slug": "",
+            "year": 2012,
+            "cat": "media",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#9333ea",
+            "drain": 5,
+            "desc": "Перша та найбільша платформа музичного стрімінгу арабського світу (Близький Схід і Північна Африка)."
+      },
+      {
+            "name": "Кабанчик (Kabanchik.ua)",
+            "symbol": "КБ",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#f59e0b",
+            "drain": 3,
+            "desc": "Український онлайн-сервіс замовлення побутових майстрів, ремонту, прибирання та кур'єрів."
+      },
+      {
+            "name": "LUN (ЛУН Місто)",
+            "symbol": "LUN",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#f97316",
+            "drain": 3,
+            "desc": "Українська платформа вибору новобудов, оренди квартир та інтерактивних карт міського комфорту."
+      },
+      {
+            "name": "Sense SuperApp / Ощад / ПУМБ",
+            "symbol": "Банк",
+            "slug": "",
+            "year": 2012,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#3b82f6",
+            "drain": 4,
+            "desc": "Мобільні банківські додатки провідних роздрібних і державних банків України."
+      },
+      {
+            "name": "Djinni",
+            "symbol": "🧞",
+            "slug": "",
+            "year": 2012,
+            "cat": "work",
+            "regions": [
+                  "ua",
+                  "west"
+            ],
+            "color": "#4f46e5",
+            "drain": 4,
+            "desc": "Сервіс анонімного пошуку роботи та рекрутингу для ІТ-спеціалістів."
+      },
+      {
+            "name": "Telegram",
+            "symbol": "TG",
+            "slug": "telegram",
+            "year": 2013,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#26A5E4",
+            "drain": 10,
+            "desc": "Головний інформаційний нерв: сотні новинних каналів, тривог, робочих чатів, ботів та крипто-мініаппів."
+      },
+      {
+            "name": "Slack",
+            "symbol": "SL",
+            "slug": "slack",
+            "year": 2013,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#4A154B",
+            "drain": 8,
+            "desc": "Корпоративний месенджер з каналами та тредами, де зелений кружечок онлайну тримає у тонусі."
+      },
+      {
+            "name": "Canva",
+            "symbol": "C",
+            "slug": "canva",
+            "year": 2013,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#00C4CC",
+            "drain": 5,
+            "desc": "Хмарна платформа швидкого дизайну презентацій, сторис та візуалу."
+      },
+      {
+            "name": "Bolt (+Bolt Food / екс-Taxify)",
+            "symbol": "Bolt",
+            "slug": "bolt",
+            "year": 2013,
+            "cat": "fintech",
+            "regions": [
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#34D186",
+            "drain": 5,
+            "desc": "Європейський суперапп міської мобільності: таксі, електросамокати, каршерінг та доставка їжі."
+      },
+      {
+            "name": "Nubank",
+            "symbol": "Nu",
+            "slug": "nubank",
+            "year": 2013,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#820AD1",
+            "drain": 6,
+            "desc": "Найбільший цифровий необанк Латинської Америки (понад 100 млн клієнтів у Бразилії, Мексиці, Колумбії)."
+      },
+      {
+            "name": "Xiaohongshu (RED / RedNote)",
+            "symbol": "小红书",
+            "slug": "xiaohongshu",
+            "year": 2013,
+            "cat": "social",
+            "regions": [
+                  "asia",
+                  "global"
+            ],
+            "color": "#FF2442",
+            "drain": 8,
+            "desc": "Китайська візуальна соцмережа стилю життя, оглядів, шопінгу та порад (гібрид Instagram та Pinterest)."
+      },
+      {
+            "name": "Patreon (Substack / BuyMeACoffee)",
+            "symbol": "P",
+            "slug": "patreon",
+            "year": 2013,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#FF424D",
+            "drain": 4,
+            "desc": "Економіка прямих щомісячних підписок на улюблених авторів, подкастерів та спільноти."
+      },
+      {
+            "name": "Google Meet (екс-Hangouts / Duo)",
+            "symbol": "Meet",
+            "slug": "googlemeet",
+            "year": 2013,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#00897B",
+            "drain": 6,
+            "desc": "Єдиний сервіс відеозустрічей Google (об'єднав колишні Google Talk, Hangouts та Google Duo)."
+      },
+      {
+            "name": "Robinhood (eToro / Trading212)",
+            "symbol": "RH",
+            "slug": "robinhood",
+            "year": 2013,
+            "cat": "fintech",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#00C805",
+            "drain": 6,
+            "desc": "Гейміфіковані інвестиції в акції, ETF та опціони просто зі смартфона."
+      },
+      {
+            "name": "DoorDash (Wolt)",
+            "symbol": "DD",
+            "slug": "doordash",
+            "year": 2013,
+            "cat": "fintech",
+            "regions": [
+                  "west"
+            ],
+            "color": "#FF3008",
+            "drain": 4,
+            "desc": "Єдина група доставки їжі DoorDash + європейська Wolt."
+      },
+      {
+            "name": "Tabletki.ua (Liki24)",
+            "symbol": "💊",
+            "slug": "",
+            "year": 2013,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#16a34a",
+            "drain": 3,
+            "desc": "Пошук, порівняння цін та бронювання ліків у аптеках України."
+      },
+      {
+            "name": "Apple Pay / Google Wallet",
+            "symbol": "Pay",
+            "slug": "applepay",
+            "year": 2014,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#1e293b",
+            "drain": 4,
+            "desc": "Безконтактна NFC-оплата смартфоном або годинником, що замінила фізичний гаманець."
+      },
+      {
+            "name": "Signal",
+            "symbol": "SG",
+            "slug": "signal",
+            "year": 2014,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#3A76F0",
+            "drain": 5,
+            "desc": "Месенджер з еталонним наскрізним шифруванням для захищеної та військової комунікації."
+      },
+      {
+            "name": "Proton (ProtonMail / VPN)",
+            "symbol": "Pr",
+            "slug": "proton",
+            "year": 2014,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#6D4AFF",
+            "drain": 4,
+            "desc": "Швейцарська екосистема зашифрованої пошти, диска та VPN-сервісів."
+      },
+      {
+            "name": "Amazon Alexa / Google Home (IoT)",
+            "symbol": "IoT",
+            "slug": "amazonalexa",
+            "year": 2014,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#00CAFF",
+            "drain": 4,
+            "desc": "Голосові асистенти та розумні колонки в домі, що постійно слухають простір."
+      },
+      {
+            "name": "Apple Watch / Смарт-годинники",
+            "symbol": "⌚",
+            "slug": "apple",
+            "year": 2015,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FA114F",
+            "drain": 7,
+            "desc": "Носимі гаджети: вібрація сповіщень просто на шкірі зап'ястя та цілодобовий трекінг пульсу й активності."
+      },
+      {
+            "name": "Discord",
+            "symbol": "DC",
+            "slug": "discord",
+            "year": 2015,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#5865F2",
+            "drain": 8,
+            "desc": "Голосові, відео- та текстові сервери для геймерів, ІТ-команд, навчання та крипто-спільнот."
+      },
+      {
+            "name": "Glovo (Delivery Hero / Foodpanda / PedidosYa)",
+            "symbol": "GL",
+            "slug": "",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FFC244",
+            "drain": 5,
+            "desc": "Єдина світова мережа кур'єрської доставки їжі Delivery Hero (Glovo в Україні/Європі, Foodpanda в Азії, PedidosYa в ЛатАм)."
+      },
+      {
+            "name": "Revolut",
+            "symbol": "R",
+            "slug": "revolut",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west"
+            ],
+            "color": "#0075EB",
+            "drain": 5,
+            "desc": "Європейський фінансовий суперапп: мультивалютні картки, акції, крипто та миттєві перекази."
+      },
+      {
+            "name": "Toss / KakaoBank",
+            "symbol": "Toss",
+            "slug": "",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#0064FF",
+            "drain": 6,
+            "desc": "Південнокорейські фінансові супераппи, що об'єднали всі банки, інвестиції та страхування в одне вікно."
+      },
+      {
+            "name": "Rappi",
+            "symbol": "RP",
+            "slug": "",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#FF441F",
+            "drain": 6,
+            "desc": "Суперапп доставки всього (їжа, ліки, готівка, фінанси) у Латинській Америці."
+      },
+      {
+            "name": "Temu / Pinduoduo (PDD)",
+            "symbol": "Temu",
+            "slug": "",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FB7701",
+            "drain": 7,
+            "desc": "Єдина корпорація PDD Holdings (Pinduoduo в Китаї, Temu у світі — без задвоєння): гейміфікований дискаунт-шопінг."
+      },
+      {
+            "name": "Shopee (Sea Group)",
+            "symbol": "S",
+            "slug": "shopee",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#EE4D2D",
+            "drain": 7,
+            "desc": "Маркетплейс №1 у Південно-Східній Азії, Тайвані та Бразилії з вбудованими іграми та лайв-стрімами."
+      },
+      {
+            "name": "Flo / Clue (Жіноче здоров'я)",
+            "symbol": "Flo",
+            "slug": "",
+            "year": 2015,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#FF5A79",
+            "drain": 4,
+            "desc": "Біо-календарі та трекери здоров'я, якими користуються понад 300 млн жінок у світі."
+      },
+      {
+            "name": "OpenAI / ChatGPT",
+            "symbol": "AI",
+            "slug": "openai",
+            "year": 2015,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#10A37F",
+            "drain": 9,
+            "desc": "Екосистема ChatGPT (GPT-4o / o3 / Sora): універсальний ШІ-співрозмовник, кодер, порадник та генератор ідей."
+      },
+      {
+            "name": "TikTok / Douyin (екс-Musical.ly)",
+            "symbol": "TT",
+            "slug": "tiktok",
+            "year": 2016,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 10,
+            "desc": "Єдина платформа ByteDance (Douyin у Китаї, TikTok у світі — без задвоєння): гіпнотична стрічка коротких відео."
+      },
+      {
+            "name": "Figma",
+            "symbol": "Fg",
+            "slug": "figma",
+            "year": 2016,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#F24E1E",
+            "drain": 6,
+            "desc": "Хмарне середовище спільного UI/UX-дизайну та прототипування в реальному часі."
+      },
+      {
+            "name": "Reliance Jio / UPI (PhonePe)",
+            "symbol": "Jio",
+            "slug": "jio",
+            "year": 2016,
+            "cat": "telecom",
+            "regions": [
+                  "asia"
+            ],
+            "color": "#0A2885",
+            "drain": 8,
+            "desc": "Індійська цифрова революція: масовий 4G/5G Jio та національна система миттєвих платежів UPI (PhonePe/GPay)."
+      },
+      {
+            "name": "Helsi (Електронна медицина UA)",
+            "symbol": "H+",
+            "slug": "",
+            "year": 2016,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#0284c7",
+            "drain": 3,
+            "desc": "Українська медична система: запис до лікаря, електронні направлення, рецепти та медкартка."
+      },
+      {
+            "name": "OnlyFans",
+            "symbol": "OF",
+            "slug": "onlyfans",
+            "year": 2016,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#00AFF0",
+            "drain": 6,
+            "desc": "Платформа платної підписки на ексклюзивний контент креаторів та парасоціального спілкування."
+      },
+      {
+            "name": "monobank (Universal Bank)",
+            "symbol": "mono",
+            "slug": "",
+            "year": 2017,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#18181b",
+            "drain": 6,
+            "desc": "Культовий український мобільний банк із котом, кешбеком, розстрочкою та «Банками» для волонтерських зборів."
+      },
+      {
+            "name": "Microsoft Teams",
+            "symbol": "T",
+            "slug": "microsoftteams",
+            "year": 2017,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#6264A7",
+            "drain": 8,
+            "desc": "Корпоративний комбайн чатів, відеодзвінків і календарів (об'єднав екс-Skype for Business / Lync)."
+      },
+      {
+            "name": "Binance (Криптобіржі / Web3 Гаманці)",
+            "symbol": "BNB",
+            "slug": "binance",
+            "year": 2017,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#F0B90B",
+            "drain": 7,
+            "desc": "Крипто-індустрія (Binance, Bybit, MetaMask, Trust): цілодобовий моніторинг свічок курсу та токенів."
+      },
+      {
+            "name": "Fortnite / Epic Games Store",
+            "symbol": "EPIC",
+            "slug": "epicgames",
+            "year": 2017,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#313131",
+            "drain": 7,
+            "desc": "Королівська битва Fortnite, рушій Unreal Engine та щотижневі роздачі ігор."
+      },
+      {
+            "name": "Укрзалізниця (Квитки у смартфоні)",
+            "symbol": "УЗ",
+            "slug": "",
+            "year": 2017,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#1e3a8a",
+            "drain": 4,
+            "desc": "Полювання за квитками на потяги, моніторинг місць та посадка з Дія.Підписом."
+      },
+      {
+            "name": "SHEIN",
+            "symbol": "S",
+            "slug": "",
+            "year": 2017,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 6,
+            "desc": "Гігант ультрашвидкої моди з тисячами нових позицій щодня та гейміфікованими знижками."
+      },
+      {
+            "name": "Notion",
+            "symbol": "N",
+            "slug": "notion",
+            "year": 2018,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 6,
+            "desc": "Універсальний «другий мозок»: бази знань, трекери звичок, робочі вікі та ШІ-нотатки."
+      },
+      {
+            "name": "Сільпо / Loko / АТБ (Супермаркети UA)",
+            "symbol": "🛒",
+            "slug": "",
+            "year": 2018,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#ff6b00",
+            "drain": 4,
+            "desc": "Додатки українських продуктових мереж (Власний Рахунок, сканер штрихкодів, швидка доставка Loko/Zakaz)."
+      },
+      {
+            "name": "1Password / Bitwarden (Паролі & 2FA)",
+            "symbol": "🔑",
+            "slug": "1password",
+            "year": 2018,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#0094F5",
+            "drain": 4,
+            "desc": "Менеджери сотень паролів та генератори одноразових кодів 2FA (Google/MS Authenticator)."
+      },
+      {
+            "name": "Disney+ / Max (HBO)",
+            "symbol": "D+",
+            "slug": "disneyplus",
+            "year": 2019,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#0063E5",
+            "drain": 6,
+            "desc": "Стрімінгові платформи медіафраншиз Disney, Pixar, Marvel, Star Wars та HBO Max."
+      },
+      {
+            "name": "Starlink (SpaceX)",
+            "symbol": "🛰",
+            "slug": "starlink",
+            "year": 2019,
+            "cat": "telecom",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 5,
+            "desc": "Низькоорбітальний супутниковий інтернет, що тримає зв'язок у польових умовах, у морі та під час блекаутів."
+      },
+      {
+            "name": "Yasno / Комунальні кабінети",
+            "symbol": "💡",
+            "slug": "",
+            "year": 2019,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#facc15",
+            "drain": 5,
+            "desc": "Передача показників лічильників, оплата комуналки та щоденна перевірка графіків відключень світла."
+      },
+      {
+            "name": "Дія (Держава в смартфоні / Резерв+ / Мрія)",
+            "symbol": "Дія",
+            "slug": "",
+            "year": 2020,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#000000",
+            "drain": 6,
+            "desc": "Українська державна екосистема: цифрові документи, ФОП, авто, шлюб, військові реєстри Резерв+/Армія+ та освіта Мрія."
+      },
+      {
+            "name": "Pix (Миттєві платежі Бразилії)",
+            "symbol": "Pix",
+            "slug": "",
+            "year": 2020,
+            "cat": "fintech",
+            "regions": [
+                  "latam_mena"
+            ],
+            "color": "#32BCAD",
+            "drain": 6,
+            "desc": "Національна система миттєвих безкоштовних QR-платежів, якою користується все доросле населення Бразилії."
+      },
+      {
+            "name": "CapCut (Мобільний відеомонтаж)",
+            "symbol": "CC",
+            "slug": "",
+            "year": 2020,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 6,
+            "desc": "Конвеєр швидкого монтажу вертикальних відео та авто-субтитрів для TikTok, Reels і Shorts."
+      },
+      {
+            "name": "Obsidian (Локальні бази знань)",
+            "symbol": "OB",
+            "slug": "obsidian",
+            "year": 2020,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#7C3AED",
+            "drain": 5,
+            "desc": "Персональні графові бази знань та пов'язаних Markdown-нотаток."
+      },
+      {
+            "name": "Polymarket (Ринки прогнозів)",
+            "symbol": "PM",
+            "slug": "",
+            "year": 2020,
+            "cat": "fintech",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#2563eb",
+            "drain": 5,
+            "desc": "Моніторинг імовірностей світових подій, виборів та геополітики через ставки в реальному часі."
+      },
+      {
+            "name": "Київ Цифровий (Smart City UA)",
+            "symbol": "КЦ",
+            "slug": "",
+            "year": 2021,
+            "cat": "fintech",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#2563eb",
+            "drain": 5,
+            "desc": "Міський суперапп: оплата проїзду, паркування, рух транспорту, укриття та сповіщення тривоги."
+      },
+      {
+            "name": "BeReal",
+            "symbol": "BR.",
+            "slug": "bereal",
+            "year": 2021,
+            "cat": "social",
+            "regions": [
+                  "west",
+                  "global"
+            ],
+            "color": "#000000",
+            "drain": 5,
+            "desc": "Соцмережа з синхронним щоденним пушем: 2 хвилини, щоб зняти себе з обох камер смартфона."
+      },
+      {
+            "name": "Midjourney (Stable Diffusion / Flux)",
+            "symbol": "MJ",
+            "slug": "",
+            "year": 2022,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#1e1b4b",
+            "drain": 6,
+            "desc": "Генеративний ШІ для створення фотореалістичних зображень, арту та синтетичної візуальної реальності."
+      },
+      {
+            "name": "Character.ai / Replika (ШІ-компаньйони)",
+            "symbol": "c.ai",
+            "slug": "",
+            "year": 2022,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#334155",
+            "drain": 8,
+            "desc": "Багатогодинне емоційне листування та рольові чати з віртуальними ШІ-персонажами."
+      },
+      {
+            "name": "Bluesky / Mastodon (Fediverse)",
+            "symbol": "🦋",
+            "slug": "bluesky",
+            "year": 2022,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "west"
+            ],
+            "color": "#0285FF",
+            "drain": 5,
+            "desc": "Децентралізовані мікроблоги з відкритим протоколом та кастомними алгоритмічними стрічками."
+      },
+      {
+            "name": "Повітряна Тривога / DeepStateMap",
+            "symbol": "🚨",
+            "slug": "",
+            "year": 2022,
+            "cat": "telecom",
+            "regions": [
+                  "ua"
+            ],
+            "color": "#dc2626",
+            "drain": 9,
+            "desc": "Екстрені сирени у смартфоні та інтерактивні карти безпеки — критичний шар щоденної реальності в Україні."
+      },
+      {
+            "name": "Threads (Meta)",
+            "symbol": "@",
+            "slug": "threads",
+            "year": 2023,
+            "cat": "social",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#000000",
+            "drain": 7,
+            "desc": "Текстова соціальна мережа, зв'язана з Instagram, із вірусними алгоритмічними дискусіями."
+      },
+      {
+            "name": "Claude (Anthropic)",
+            "symbol": "CL",
+            "slug": "anthropic",
+            "year": 2023,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#D97757",
+            "drain": 8,
+            "desc": "Інтелектуальний ШІ-асистент та агент розробки (Claude Code) для глибокого аналізу, текстів та програмування."
+      },
+      {
+            "name": "Perplexity AI",
+            "symbol": "Px",
+            "slug": "perplexity",
+            "year": 2023,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#20808D",
+            "drain": 6,
+            "desc": "ШІ-пошуковик, що замінює перехід по сайтах готовим синтезованим конспектом із джерелами."
+      },
+      {
+            "name": "Cursor / GitHub Copilot (AI IDE)",
+            "symbol": "AI>",
+            "slug": "",
+            "year": 2023,
+            "cat": "work",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#3b82f6",
+            "drain": 7,
+            "desc": "Автономне написання коду та автодоповнення думок розробника в реальному часі."
+      },
+      {
+            "name": "Suno / ElevenLabs (Аудіо та Голос ШІ)",
+            "symbol": "🎙",
+            "slug": "",
+            "year": 2023,
+            "cat": "media",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia"
+            ],
+            "color": "#9333ea",
+            "drain": 5,
+            "desc": "Генерація повноцінних пісень, клонування голосів та дубляж відео будь-якими мовами за секунди."
+      },
+      {
+            "name": "Google Gemini (AI Overviews)",
+            "symbol": "✦",
+            "slug": "googlegemini",
+            "year": 2024,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#4E75FF",
+            "drain": 8,
+            "desc": "Мультимодальний ШІ-асистент Google, вбудований безпосередньо в Android, Пошук, Пошту та Документи."
+      },
+      {
+            "name": "Apple Vision Pro / Meta Quest (XR Окуляри)",
+            "symbol": "🥽",
+            "slug": "",
+            "year": 2024,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "west",
+                  "asia"
+            ],
+            "color": "#312e81",
+            "drain": 8,
+            "desc": "Просторові комп'ютери та змішана реальність: вікна сервісів буквально перекривають фізичну кімнату перед очима."
+      },
+      {
+            "name": "DeepSeek / Qwen (Азійські Reasoning LLM)",
+            "symbol": "🐳",
+            "slug": "",
+            "year": 2025,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#2563eb",
+            "drain": 7,
+            "desc": "Відкриті моделі глибокого міркування (Reasoning AI), інтегровані у пошук, месенджери та локальні пристрої."
+      },
+      {
+            "name": "Автономні ШІ-Агенти 24/7",
+            "symbol": "24/7",
+            "slug": "",
+            "year": 2026,
+            "cat": "ai",
+            "regions": [
+                  "global",
+                  "ua",
+                  "west",
+                  "asia",
+                  "latam_mena"
+            ],
+            "color": "#ec4899",
+            "drain": 10,
+            "desc": "Персональні ШІ-посередники, що ведуть листування, купують товари й фільтрують реальність замість самої людини."
+      }
+];
+
+    const ERA_INFO = [
+      {
+        maxYear: 1983,
+        badge: '1975–1983 • Зародження 1G та Аналогова ера',
+        desc: 'Людина живе у відкритому фізичному світі. Навколо — лише базові канали: дротовий телефон, пошта, радіо, ефірне ТБ, перші банкомати, касетний Walkman та перші стільникові Motorola 1G.'
+      },
+      {
+        maxYear: 1994,
+        badge: '1984–1994 • ПК, Пейджери, Консолі та поява 2G GSM',
+        desc: 'З’являються Windows та Office, пейджери, перші SMS, мобільні Nokia, мережі UMC/Vodafone, ПриватБанк та перші веб-сайти. Інформаційна оболонка ще тонка і проникна.'
+      },
+      {
+        maxYear: 2006,
+        badge: '1995–2006 • Бум DotCom, ICQ, Пошуковики та перші Соцмережі',
+        desc: 'Епоха ICQ, Google, Yahoo, Amazon, AliExpress, Tencent QQ, Baidu, Wikipedia, Skype, Steam, Facebook, YouTube, Приват24, Rozetka та Нова Пошта. Цифровий контур починає стягуватися.'
+      },
+      {
+        maxYear: 2015,
+        badge: '2007–2015 • Смартфони (iOS/Android), 3G/4G та Супераппи',
+        desc: 'Усі сервіси переїжджають у кишеню: WhatsApp, Instagram, Viber, Telegram, WeChat, LINE, KakaoTalk, Uber, Uklon, Airbnb, Slack, Discord та смарт-годинники. Голова людини опускається до екрана.'
+      },
+      {
+        maxYear: 2021,
+        badge: '2016–2021 • Дофаміновий конвеєр (TikTok), Доставка та Держава в смартфоні',
+        desc: 'Алгоритмічний потік коротких відео (TikTok/Douyin, Reels, Shorts), необанки (monobank, Revolut, Nubank, Pix), миттєва доставка (Glovo, Meituan, DoorDash) та цифрова держава Дія.'
+      },
+      {
+        maxYear: 2026,
+        badge: '2022–2026 • 5G, Генеративний ШІ та Тотальний Цифровий Кокон',
+        desc: 'Сотні сервісів усіх країн світу, ChatGPT, Claude, Gemini, DeepSeek, AR/VR-окуляри та автономні ШІ-агенти 24/7 утворюють щільну багатошарову сферу, що фільтрує всю реальність навколо людини.'
+      }
+    ];
+
+    // ============================================================================
+    // 2. ІНІЦІАЛІЗАЦІЯ THREE.JS СЦЕНИ
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x070913, 0.0075);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 14, 52);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxDistance = 160;
+    controls.minDistance = 0.5;
+    controls.target.set(0, 5, 0);
+
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.8);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(20, 40, 30);
+    scene.add(dirLight);
+
+    const phoneGlowLight = new THREE.PointLight(0x38bdf8, 2.2, 18);
+    phoneGlowLight.position.set(0, 5.2, 1.8);
+    scene.add(phoneGlowLight);
+
+    // Зоряне небо на фоні (реальний світ за межами інформаційної бульбашки)
+    function createStarfield() {
+      const geo = new THREE.BufferGeometry();
+      const count = 2000;
+      const pos = new Float32Array(count * 3);
+      for (let i = 0; i < count * 3; i += 3) {
+        const r = 105 + Math.random() * 95;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        pos[i] = r * Math.sin(phi) * Math.cos(theta);
+        pos[i + 1] = r * Math.sin(phi) * Math.sin(theta);
+        pos[i + 2] = r * Math.cos(phi);
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const mat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.45, transparent: true, opacity: 0.7 });
+      return new THREE.Points(geo, mat);
+    }
+    const starfield = createStarfield();
+    scene.add(starfield);
+
+    // ============================================================================
+    // 3. СТВОРЕННЯ 3D-ФІГУРКИ ЛЮДИНИ (В ЦЕНТРІ ГЛОБУСА)
+    // ============================================================================
+    const humanGroup = new THREE.Group();
+    scene.add(humanGroup);
+
+    const baseGrid = new THREE.PolarGridHelper(32, 16, 8, 64, 0x1e293b, 0x0f172a);
+    baseGrid.position.y = -4.5;
+    scene.add(baseGrid);
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x64748b,
+      roughness: 0.35,
+      metalness: 0.3,
+      emissive: 0x0f172a,
+      emissiveIntensity: 0.4
+    });
+
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 6.2, 0);
+    humanGroup.add(headGroup);
+
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(1.15, 32, 32), bodyMat);
+    headGroup.add(headMesh);
+
+    const visorMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.0 });
+    const visorMesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.48, 0.9), visorMat);
+    visorMesh.position.set(0, 0.05, 0.82);
+    headGroup.add(visorMesh);
+
+    const torsoMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.25, 4.2, 24), bodyMat);
+    torsoMesh.position.set(0, 2.5, 0);
+    humanGroup.add(torsoMesh);
+
+    const legGeo = new THREE.CylinderGeometry(0.42, 0.34, 4.8, 16);
+    const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+    leftLeg.position.set(-0.55, -2.0, 0);
+    humanGroup.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+    rightLeg.position.set(0.55, -2.0, 0);
+    humanGroup.add(rightLeg);
+
+    const armsGroup = new THREE.Group();
+    armsGroup.position.set(0, 4.2, 0);
+    humanGroup.add(armsGroup);
+
+    const armGeo = new THREE.CylinderGeometry(0.3, 0.26, 3.2, 16);
+    const leftArm = new THREE.Mesh(armGeo, bodyMat);
+    leftArm.position.set(-1.35, -0.8, 0.8);
+    leftArm.rotation.x = -Math.PI / 3.2;
+    leftArm.rotation.z = -0.3;
+    armsGroup.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeo, bodyMat);
+    rightArm.position.set(1.35, -0.8, 0.8);
+    rightArm.rotation.x = -Math.PI / 3.2;
+    rightArm.rotation.z = 0.3;
+    armsGroup.add(rightArm);
+
+    const phoneMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.9, 1.5, 0.1),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    phoneMesh.position.set(0, -0.7, 2.05);
+    phoneMesh.rotation.x = -0.5;
+    armsGroup.add(phoneMesh);
+
+    const coneGeo = new THREE.ConeGeometry(2.1, 3.4, 24, 1, true);
+    const coneMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.18,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const attentionCone = new THREE.Mesh(coneGeo, coneMat);
+    attentionCone.position.set(0, 0.65, 1.2);
+    attentionCone.rotation.x = -0.55;
+    armsGroup.add(attentionCone);
+
+    const cocoonGeo = new THREE.SphereGeometry(1, 36, 36);
+    const cocoonMat = new THREE.MeshBasicMaterial({
+      color: 0x6366f1,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.12
+    });
+    const cocoonWire = new THREE.Mesh(cocoonGeo, cocoonMat);
+    cocoonWire.position.set(0, 3.8, 0);
+    scene.add(cocoonWire);
+
+    const cocoonDarkMat = new THREE.MeshBasicMaterial({
+      color: 0x050711,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    const cocoonDarkShell = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), cocoonDarkMat);
+    cocoonDarkShell.position.set(0, 3.8, 0);
+    scene.add(cocoonDarkShell);
+
+    // ============================================================================
+    // 4. ЛІНІЙНА ШКАЛА (ОСІ ТА ДИНАМІЧНА 3D-КРИВА РОСТУ ПО РОКАХ)
+    // ============================================================================
+    const linearEnvGroup = new THREE.Group();
+    scene.add(linearEnvGroup);
+
+    function yearToX(year) {
+      return ((year - 1975) / (2026 - 1975)) * 84 - 42;
+    }
+
+    function createTextSprite(text, color = '#94a3b8', fontSize = 44) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.font = `bold ${fontSize}px Segoe UI, sans-serif`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 64);
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(4.5, 2.25, 1);
+      return sprite;
+    }
+
+    const axisPoints = [new THREE.Vector3(-44, -3.5, 0), new THREE.Vector3(44, -3.5, 0)];
+    const axisGeo = new THREE.BufferGeometry().setFromPoints(axisPoints);
+    const axisLine = new THREE.Line(axisGeo, new THREE.LineBasicMaterial({ color: 0x475569 }));
+    linearEnvGroup.add(axisLine);
+
+    [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2026].forEach(yr => {
+      const x = yearToX(yr);
+      const lbl = createTextSprite(String(yr), '#38bdf8', 46);
+      lbl.position.set(x, -5.2, 2);
+      linearEnvGroup.add(lbl);
+    });
+
+    let growthTube = null;
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.6,
+      roughness: 0.2
+    });
+
+    function rebuildGrowthCurve(profileServices) {
+      if (growthTube) {
+        linearEnvGroup.remove(growthTube);
+        growthTube.geometry.dispose();
+      }
+      const total = Math.max(1, profileServices.length);
+      const curvePts = [];
+      for (let y = 1975; y <= 2026; y++) {
+        const cnt = profileServices.filter(s => s.year <= y).length;
+        const x = yearToX(y);
+        const yPos = -3.0 + (cnt / total) * 26;
+        curvePts.push(new THREE.Vector3(x, yPos, -4.5));
+      }
+      const growthCurve = new THREE.CatmullRomCurve3(curvePts);
+      const tubeGeo = new THREE.TubeGeometry(growthCurve, 100, 0.26, 12, false);
+      growthTube = new THREE.Mesh(tubeGeo, tubeMat);
+      linearEnvGroup.add(growthTube);
+    }
+
+    const yearCursorGeo = new THREE.CylinderGeometry(0.14, 0.14, 30, 12);
+    const yearCursorMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.65 });
+    const yearCursorMesh = new THREE.Mesh(yearCursorGeo, yearCursorMat);
+    yearCursorMesh.position.set(yearToX(2026), 11, -4.5);
+    linearEnvGroup.add(yearCursorMesh);
+
+    // ============================================================================
+    // 5. ГЕНЕРАТОР ПОВНОРОЗМІРНИХ ОРИГІНАЛЬНИХ БРЕНД-ЛОГОТИПІВ (384x384 + SimpleIcons SVG)
+    // ============================================================================
+    const TEX_SIZE = 384;
+
+    function drawSquircleClip(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    // Малює повнорозмірний оригінальний бренд на весь розмір іконки (у координатній сітці 512x512, масштабованій під TEX_SIZE)
+    function drawOriginalBrandArtwork(ctx, srv, loadedLogoImg = null) {
+      const n = srv.name;
+      ctx.save();
+      const s = TEX_SIZE / 512;
+      ctx.scale(s, s);
+
+      const fillBg = (c1, c2 = null) => {
+        if (!c2) {
+          ctx.fillStyle = c1;
+        } else {
+          const g = ctx.createLinearGradient(0, 0, 512, 512);
+          g.addColorStop(0, c1);
+          g.addColorStop(1, c2);
+          ctx.fillStyle = g;
+        }
+        ctx.fillRect(0, 0, 512, 512);
+      };
+
+      // 1) Кастомні мультиколірні та знакові бренди, промальовані векторно на весь розмір плитки
+      if (n.includes('Google Search')) {
+        fillBg('#ffffff');
+        const cx = 256, cy = 256, r = 165;
+        ctx.lineWidth = 72;
+        ctx.strokeStyle = '#EA4335'; ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 1.15, Math.PI * 1.78); ctx.stroke();
+        ctx.strokeStyle = '#FBBC05'; ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.82, Math.PI * 1.15); ctx.stroke();
+        ctx.strokeStyle = '#34A853'; ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.22, Math.PI * 0.82); ctx.stroke();
+        ctx.strokeStyle = '#4285F4'; ctx.beginPath(); ctx.arc(cx, cy, r, -0.05, Math.PI * 0.22); ctx.stroke();
+        ctx.fillStyle = '#4285F4'; ctx.fillRect(256, 222, 195, 68);
+      } else if (n.includes('Instagram')) {
+        const ig = ctx.createRadialGradient(140, 490, 30, 280, 220, 480);
+        ig.addColorStop(0, '#fdf497'); ig.addColorStop(0.15, '#fd5949');
+        ig.addColorStop(0.55, '#d6249f'); ig.addColorStop(1, '#285AEB');
+        ctx.fillStyle = ig; ctx.fillRect(0, 0, 512, 512);
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 36;
+        drawSquircleClip(ctx, 88, 88, 336, 336, 92); ctx.stroke();
+        ctx.beginPath(); ctx.arc(256, 256, 84, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(348, 164, 22, 0, Math.PI * 2); ctx.fill();
+      } else if (n.includes('YouTube')) {
+        fillBg('#FF0000', '#CC0000');
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.moveTo(185, 132); ctx.lineTo(382, 256); ctx.lineTo(185, 380); ctx.closePath(); ctx.fill();
+      } else if (n.includes('TikTok')) {
+        fillBg('#000000');
+        const drawNote = (ox, oy, col) => {
+          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 54; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.arc(215 + ox, 345 + oy, 75, 0, Math.PI * 1.65); ctx.stroke();
+          ctx.fillRect(263 + ox, 95 + oy, 54, 255);
+          ctx.beginPath(); ctx.arc(365 + ox, 115 + oy, 82, Math.PI * 0.5, Math.PI); ctx.stroke();
+        };
+        drawNote(-14, -10, '#25F4EE'); drawNote(14, 10, '#FE2C55'); drawNote(0, 0, '#ffffff');
+      } else if (n.includes('Microsoft Windows')) {
+        fillBg('#ffffff');
+        const pad = 48, gap = 24, sq = (512 - pad * 2 - gap) / 2;
+        ctx.fillStyle = '#F25022'; ctx.fillRect(pad, pad, sq, sq);
+        ctx.fillStyle = '#7FBA00'; ctx.fillRect(pad + sq + gap, pad, sq, sq);
+        ctx.fillStyle = '#00A4EF'; ctx.fillRect(pad, pad + sq + gap, sq, sq);
+        ctx.fillStyle = '#FFB900'; ctx.fillRect(pad + sq + gap, pad + sq + gap, sq, sq);
+      } else if (n.includes('Gmail')) {
+        fillBg('#ffffff');
+        ctx.lineWidth = 68; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#4285F4'; ctx.beginPath(); ctx.moveTo(86, 390); ctx.lineTo(86, 155); ctx.stroke();
+        ctx.strokeStyle = '#34A853'; ctx.beginPath(); ctx.moveTo(426, 390); ctx.lineTo(426, 155); ctx.stroke();
+        ctx.strokeStyle = '#EA4335'; ctx.beginPath(); ctx.moveTo(86, 145); ctx.lineTo(256, 285); ctx.lineTo(426, 145); ctx.stroke();
+      } else if (n.includes('Google Maps')) {
+        fillBg('#ffffff');
+        ctx.fillStyle = '#EA4335'; ctx.beginPath(); ctx.arc(256, 195, 135, Math.PI, 0); ctx.lineTo(256, 455); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#34A853'; ctx.beginPath(); ctx.arc(256, 195, 135, Math.PI * 0.7, Math.PI * 1.3); ctx.fill();
+        ctx.fillStyle = '#4285F4'; ctx.beginPath(); ctx.arc(256, 195, 135, -0.4, Math.PI * 0.4); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(256, 195, 56, 0, Math.PI * 2); ctx.fill();
+      } else if (n.includes('Google Chrome')) {
+        fillBg('#ffffff');
+        ctx.lineWidth = 85;
+        ctx.strokeStyle = '#EA4335'; ctx.beginPath(); ctx.arc(256, 256, 150, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+        ctx.strokeStyle = '#FBBC05'; ctx.beginPath(); ctx.arc(256, 256, 150, Math.PI * 1.9, Math.PI * 0.55); ctx.stroke();
+        ctx.strokeStyle = '#34A853'; ctx.beginPath(); ctx.arc(256, 256, 150, Math.PI * 0.55, Math.PI * 1.1); ctx.stroke();
+        ctx.fillStyle = '#4285F4'; ctx.beginPath(); ctx.arc(256, 256, 78, 0, Math.PI * 2); ctx.fill();
+      } else if (n.includes('ПриватБанк')) {
+        fillBg('#56B847', '#3B8C2E');
+        ctx.fillStyle = '#111827'; drawSquircleClip(ctx, 48, 48, 416, 416, 65); ctx.fill();
+        ctx.fillStyle = '#56B847'; ctx.font = '900 225px Segoe UI, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('24', 256, 265);
+      } else if (n.includes('monobank')) {
+        fillBg('#000000', '#18181b');
+        ctx.fillStyle = '#ffffff'; ctx.font = '900 142px Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('mono', 256, 220);
+        ctx.fillStyle = '#ef4444'; ctx.fillRect(88, 320, 336, 28);
+      } else if (n.includes('Дія')) {
+        fillBg('#000000');
+        const dg = ctx.createLinearGradient(0, 512, 512, 0);
+        dg.addColorStop(0, 'rgba(56, 189, 248, 0.58)');
+        dg.addColorStop(0.5, 'rgba(168, 85, 247, 0.38)');
+        dg.addColorStop(1, 'rgba(250, 204, 21, 0.58)');
+        ctx.fillStyle = dg; ctx.fillRect(0, 0, 512, 512);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 215px Segoe UI, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Дія', 256, 262);
+      } else if (n.includes('Київстар')) {
+        fillBg('#00A0FF', '#0056B3');
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 44; ctx.lineCap = 'round';
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(256 + Math.cos(ang) * 52, 266 + Math.sin(ang) * 52);
+          ctx.lineTo(256 + Math.cos(ang) * 185, 266 + Math.sin(ang) * 185);
+          ctx.stroke();
+        }
+      } else if (n.includes('Нова Пошта')) {
+        fillBg('#E30613', '#B8000B');
+        ctx.fillStyle = '#ffffff';
+        // Фірмові стрілки Нової Пошти у 4 боки на весь розмір
+        ctx.beginPath();
+        ctx.moveTo(256, 65); ctx.lineTo(355, 165); ctx.lineTo(295, 165); ctx.lineTo(295, 347);
+        ctx.lineTo(355, 347); ctx.lineTo(256, 447); ctx.lineTo(157, 347); ctx.lineTo(217, 347);
+        ctx.lineTo(217, 165); ctx.lineTo(157, 165); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(65, 256); ctx.lineTo(165, 157); ctx.lineTo(165, 355); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(447, 256); ctx.lineTo(347, 157); ctx.lineTo(347, 355); ctx.closePath(); ctx.fill();
+      } else if (n.includes('Rozetka')) {
+        fillBg('#00A046', '#007A33');
+        // Фірмова усміхнена розетка на весь розмір
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 34; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.arc(256, 256, 175, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(195, 215, 28, 0, Math.PI * 2); ctx.arc(317, 215, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(256, 265, 95, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      } else if (n.includes('OLX')) {
+        fillBg('#002F34');
+        ctx.fillStyle = '#23E5DB';
+        ctx.font = '900 195px Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('OLX', 256, 256);
+      } else if (n.includes('Uklon')) {
+        fillBg('#FACC15', '#EAB308');
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '900 155px Segoe UI, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('uklon', 256, 256);
+      } else if (n.includes('lifecell')) {
+        fillBg('#FFC700', '#F59E0B');
+        ctx.fillStyle = '#0057B8';
+        ctx.font = '900 132px Segoe UI, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('lifecell', 256, 256);
+      } else if (n.includes('ICQ')) {
+        fillBg('#1e293b', '#0f172a');
+        for (let i = 0; i < 8; i++) {
+          const ang = (i / 8) * Math.PI * 2 - Math.PI / 2;
+          ctx.save();
+          ctx.translate(256 + Math.cos(ang) * 125, 256 + Math.sin(ang) * 125);
+          ctx.rotate(ang);
+          ctx.fillStyle = i === 5 ? '#ef4444' : '#22c55e';
+          ctx.beginPath(); ctx.ellipse(0, 0, 72, 46, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+        ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(256, 256, 56, 0, Math.PI * 2); ctx.fill();
+      } else if (n.includes('Slack')) {
+        fillBg('#4A154B', '#2c0b2d');
+        ctx.lineCap = 'round'; ctx.lineWidth = 54;
+        ctx.strokeStyle = '#36C5F0'; ctx.beginPath(); ctx.moveTo(125, 195); ctx.lineTo(310, 195); ctx.stroke();
+        ctx.strokeStyle = '#2EB67D'; ctx.beginPath(); ctx.moveTo(317, 125); ctx.lineTo(317, 310); ctx.stroke();
+        ctx.strokeStyle = '#ECB22E'; ctx.beginPath(); ctx.moveTo(202, 317); ctx.lineTo(387, 317); ctx.stroke();
+        ctx.strokeStyle = '#E01E5A'; ctx.beginPath(); ctx.moveTo(195, 202); ctx.lineTo(195, 387); ctx.stroke();
+      } else if (n.includes('Gemini')) {
+        fillBg('#0B1120', '#1E1B4B');
+        const gg = ctx.createLinearGradient(80, 80, 430, 430);
+        gg.addColorStop(0, '#38bdf8'); gg.addColorStop(0.5, '#818cf8'); gg.addColorStop(1, '#f43f5e');
+        ctx.fillStyle = gg;
+        ctx.beginPath();
+        ctx.moveTo(256, 52); ctx.quadraticCurveTo(256, 256, 460, 256);
+        ctx.quadraticCurveTo(256, 256, 256, 460); ctx.quadraticCurveTo(256, 256, 52, 256);
+        ctx.quadraticCurveTo(256, 256, 256, 52); ctx.fill();
+      } else if (loadedLogoImg) {
+        // 2) Якщо підвантажився офіційний векторний SVG-логотип з SimpleIcons CDN — малюємо на весь розмір фірмової плитки!
+        fillBg(srv.color);
+        ctx.drawImage(loadedLogoImg, 76, 76, 360, 360);
+      } else {
+        // 3) Багатий фірмовий бренд-тайл на весь розмір іконки для решти сервісів
+        fillBg(srv.color, '#0f172a');
+        // Декоративне кільце бренду
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = 18;
+        ctx.beginPath();
+        ctx.arc(256, 256, 198, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Великий символ / назва бренду на весь розмір
+        ctx.fillStyle = '#ffffff';
+        const sym = srv.symbol || srv.name.slice(0, 3);
+        const symFont = sym.length > 3 ? 115 : (sym.length === 3 ? 145 : (sym.length === 2 ? 185 : 235));
+        ctx.font = `900 ${symFont}px Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur = 14;
+        ctx.fillText(sym, 256, 232);
+
+        // Чітка фірмова назва знизу всередині бренду
+        ctx.font = '800 42px Segoe UI, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        const cleanTitle = srv.name.split('(')[0].split('/')[0].trim();
+        ctx.fillText(cleanTitle.slice(0, 14), 256, 392);
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.restore();
+    }
+
+    function renderNodeCanvas(node, showBadge, showCaption) {
+      const canvas = node.canvas;
+      const ctx = canvas.getContext('2d');
+      const service = node.service;
+      ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
+
+      const s = TEX_SIZE / 512;
+      ctx.save();
+      drawSquircleClip(ctx, 8 * s, 8 * s, 496 * s, 496 * s, 96 * s);
+      ctx.clip();
+
+      drawOriginalBrandArtwork(ctx, service, node.loadedImg);
+
+      if (showCaption) {
+        const bottomBar = ctx.createLinearGradient(0, 380 * s, 0, 504 * s);
+        bottomBar.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        bottomBar.addColorStop(1, 'rgba(5, 8, 18, 0.86)');
+        ctx.fillStyle = bottomBar;
+        ctx.fillRect(0, 380 * s, TEX_SIZE, 132 * s);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(34 * s)}px Segoe UI, sans-serif`;
+        ctx.textAlign = 'center';
+        const shortName = service.name.length > 17 ? service.name.slice(0, 16) + '…' : service.name;
+        ctx.fillText(`${shortName} • ${service.year}`, 256 * s, 472 * s);
+      }
+
+      ctx.restore();
+
+      // Рамка
+      drawSquircleClip(ctx, 8 * s, 8 * s, 496 * s, 496 * s, 96 * s);
+      ctx.lineWidth = 10 * s;
+      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+      ctx.stroke();
+
+      // Червоний бейдж сповіщень "+99"
+      if (showBadge && service.drain >= 4) {
+        ctx.beginPath();
+        ctx.arc(432 * s, 78 * s, 56 * s, 0, Math.PI * 2);
+        ctx.fillStyle = '#f43f5e';
+        ctx.fill();
+        ctx.lineWidth = 8 * s;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `900 ${Math.round(40 * s)}px Segoe UI, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(service.drain >= 8 ? '99+' : `+${service.drain * 3}`, 432 * s, 80 * s);
+      }
+
+      node.texture.needsUpdate = true;
+    }
+
+    const brandNodes = [];
+    const cardGeo = new THREE.BoxGeometry(2.15, 2.15, 0.26);
+    const sideMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+    const tetherGroup = new THREE.Group();
+    scene.add(tetherGroup);
+
+    SERVICES.forEach((srv, idx) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = TEX_SIZE;
+      canvas.height = TEX_SIZE;
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = 4;
+
+      const faceMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+      const materials = [sideMat, sideMat, sideMat, sideMat, faceMat, faceMat];
+      const mesh = new THREE.Mesh(cardGeo, materials);
+
+      const tetherGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 6.2, 0),
+        new THREE.Vector3(0, 6.2, 0)
+      ]);
+      const tetherMat = new THREE.LineBasicMaterial({
+        color: new THREE.Color(srv.color),
+        transparent: true,
+        opacity: 0.24
+      });
+      const tetherLine = new THREE.Line(tetherGeo, tetherMat);
+      tetherGroup.add(tetherLine);
+
+      const node = {
+        mesh,
+        service: srv,
+        canvas,
+        texture,
+        loadedImg: null,
+        inProfile: true,
+        linearPos: new THREE.Vector3(),
+        theta: 0,
+        phi: 0,
+        orbitSpeed: (0.11 + (idx % 7) * 0.03) * (idx % 2 === 0 ? 1 : -1),
+        layerOffset: (idx % 4) * 1.15,
+        tetherLine
+      };
+
+      mesh.userData = { node, service: srv };
+      scene.add(mesh);
+      brandNodes.push(node);
+
+      // Початковий рендер іконки
+      renderNodeCanvas(node, true, false);
+
+      // Якщо є офіційний векторний логотип у SimpleIcons CDN — асинхронно довантажуємо його на весь розмір плитки
+      if (srv.slug) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const iconHex = (srv.color.toUpperCase() === '#FFFC00' || srv.color.toUpperCase() === '#FFE812' || srv.color.toUpperCase() === '#FFE600' || srv.color.toUpperCase() === '#FFD02F') ? '000000' : 'ffffff';
+        img.onload = () => {
+          node.loadedImg = img;
+          renderNodeCanvas(node, document.getElementById('chk-badges').checked, document.getElementById('chk-captions').checked);
+        };
+        img.src = `https://cdn.simpleicons.org/${srv.slug}/${iconHex}`;
+      }
+    });
+
+    // ============================================================================
+    // 6. ПЕРЕМИКАЧ ПРОФІЛЮ ЛЮДИНИ (КРАЇНИ / РОЛЬ / ПОШУК / КАТЕГОРІЇ)
+    // ============================================================================
+    let currentYear = 2026;
+    let viewMode = 'linear'; // 'linear' | 'globe' | 'inside'
+    let currentRegion = 'all';
+    let currentPersona = 'all';
+    let currentCatFilter = null;
+    let searchQuery = '';
+    let isPlaying = false;
+    let playTimer = 0;
+    let squeezeFactor = 1.0;
+    let iconScale = 1.0;
+
+    const yearSlider = document.getElementById('year-slider');
+    const yearLabel = document.getElementById('year-label');
+    const regionSelect = document.getElementById('region-select');
+    const personaSelect = document.getElementById('persona-select');
+    const brandSearch = document.getElementById('brand-search');
+    const squeezeSlider = document.getElementById('squeeze-slider');
+    const scaleSlider = document.getElementById('scale-slider');
+    const chkTethers = document.getElementById('chk-tethers');
+    const chkShell = document.getElementById('chk-shell');
+    const chkBadges = document.getElementById('chk-badges');
+    const chkCaptions = document.getElementById('chk-captions');
+    const blindersOverlay = document.getElementById('blinders-overlay');
+    const categoryListEl = document.getElementById('category-list');
+
+    function matchesProfile(srv) {
+      // 1) Фільтр країни / регіону
+      if (currentRegion === 'global_only') {
+        if (!srv.regions.includes('global')) return false;
+      } else if (currentRegion !== 'all') {
+        if (!srv.regions.includes(currentRegion) && !srv.regions.includes('global')) return false;
+      }
+
+      // 2) Фільтр життєвого профілю людини
+      if (currentPersona === 'work_ai') {
+        if (!['work', 'ai', 'telecom'].includes(srv.cat)) return false;
+      } else if (currentPersona === 'social_media') {
+        if (!['social', 'telecom', 'media'].includes(srv.cat)) return false;
+      } else if (currentPersona === 'daily_fintech') {
+        if (!['fintech', 'telecom'].includes(srv.cat)) return false;
+      } else if (currentPersona === 'gamer') {
+        if (!['ai', 'media', 'telecom'].includes(srv.cat)) return false;
+      }
+
+      // 3) Фільтр категорії з правої легенди
+      if (currentCatFilter && srv.cat !== currentCatFilter) return false;
+
+      // 4) Текстовий пошук бренду
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const hay = (srv.name + ' ' + srv.symbol + ' ' + srv.desc).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      return true;
+    }
+
+    function recalculateProfileLayout() {
+      const profileNodes = brandNodes.filter(n => {
+        n.inProfile = matchesProfile(n.service);
+        return n.inProfile;
+      });
+
+      const totalProfile = Math.max(1, profileNodes.length);
+      document.getElementById('profile-total-pill').textContent = `${profileNodes.length} серв.`;
+
+      // Перераховуємо координати лінійного графіка та сфери Фібоначчі лише для сервісів обраного профілю людини
+      const yearCounts = {};
+      const goldenRatio = (1 + Math.sqrt(5)) / 2;
+
+      profileNodes.forEach((node, idx) => {
+        const srv = node.service;
+        const yIdx = yearCounts[srv.year] || 0;
+        yearCounts[srv.year] = yIdx + 1;
+
+        const cumulativeCount = profileNodes.filter(n => n.service.year <= srv.year).length;
+        const xLin = yearToX(srv.year);
+        const yLin = -2.0 + (cumulativeCount / totalProfile) * 23 + (yIdx % 4) * 2.15;
+        const zLin = ((idx % 7) - 3) * 2.35;
+        node.linearPos.set(xLin, yLin, zLin);
+
+        node.theta = 2 * Math.PI * idx / goldenRatio;
+        node.phi = Math.acos(1 - 2 * (idx + 0.5) / totalProfile);
+      });
+
+      rebuildGrowthCurve(profileNodes.map(n => n.service));
+      updateSimulationState();
+    }
+
+    function setCategoryFilter(catKey) {
+      currentCatFilter = (currentCatFilter === catKey) ? null : catKey;
+      document.getElementById('reset-cat-btn').style.display = currentCatFilter ? 'inline' : 'none';
+      recalculateProfileLayout();
+    }
+
+    function renderLegend(activeProfileNodes) {
+      categoryListEl.innerHTML = '';
+      Object.entries(CATEGORIES).forEach(([key, cat]) => {
+        const cnt = activeProfileNodes.filter(n => n.service.cat === key).length;
+        const item = document.createElement('div');
+        item.className = 'legend-item' + (currentCatFilter === key ? ' active-cat' : '');
+        item.onclick = () => setCategoryFilter(key);
+        item.innerHTML = `
+          <div class="legend-left">
+            <div class="legend-dot" style="background:${cat.color}"></div>
+            <span>${cat.name}</span>
+          </div>
+          <strong>${cnt}</strong>
+        `;
+        categoryListEl.appendChild(item);
+      });
+    }
+
+    regionSelect.addEventListener('change', (e) => {
+      currentRegion = e.target.value;
+      recalculateProfileLayout();
+    });
+
+    personaSelect.addEventListener('change', (e) => {
+      currentPersona = e.target.value;
+      recalculateProfileLayout();
+    });
+
+    brandSearch.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      recalculateProfileLayout();
+    });
+
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('btn-linear').classList.toggle('active', mode === 'linear');
+      document.getElementById('btn-globe').classList.toggle('active', mode === 'globe');
+      document.getElementById('btn-inside').classList.toggle('active', mode === 'inside');
+
+      if (mode === 'linear') {
+        controls.target.set(0, 7, 0);
+        camera.position.set(0, 13, 56);
+      } else if (mode === 'globe') {
+        controls.target.set(0, 5.2, 0);
+        camera.position.set(0, 9, 27);
+      } else if (mode === 'inside') {
+        controls.target.set(0, 6.0, 2.5);
+        camera.position.set(0, 6.2, 0.1);
+      }
+      updateSimulationState();
+    }
+
+    function jumpToYear(yr) {
+      currentYear = yr;
+      yearSlider.value = yr;
+      updateSimulationState();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('btn-play');
+      if (isPlaying) {
+        if (currentYear >= 2026) currentYear = 1975;
+        btn.textContent = '⏸ Пауза';
+      } else {
+        btn.textContent = '▶ Авто-еволюція';
+      }
+    }
+
+    yearSlider.addEventListener('input', (e) => {
+      currentYear = parseInt(e.target.value, 10);
+      updateSimulationState();
+    });
+
+    squeezeSlider.addEventListener('input', (e) => {
+      squeezeFactor = parseFloat(e.target.value);
+      document.getElementById('squeeze-val').textContent = Math.round(squeezeFactor * 100) + '%';
+    });
+
+    scaleSlider.addEventListener('input', (e) => {
+      iconScale = parseFloat(e.target.value);
+      document.getElementById('scale-val').textContent = Math.round(iconScale * 100) + '%';
+    });
+
+    function refreshAllIconTextures() {
+      const showB = chkBadges.checked;
+      const showC = chkCaptions.checked;
+      brandNodes.forEach(node => renderNodeCanvas(node, showB, showC));
+    }
+
+    chkBadges.addEventListener('change', refreshAllIconTextures);
+    chkCaptions.addEventListener('change', refreshAllIconTextures);
+
+    function updateSimulationState() {
+      yearLabel.textContent = currentYear;
+      yearCursorMesh.position.x = yearToX(currentYear);
+
+      const activeProfileNodes = brandNodes.filter(n => n.inProfile && n.service.year <= currentYear);
+      const count = activeProfileNodes.length;
+      const progress = (currentYear - 1975) / (2026 - 1975);
+
+      const totalAccounts = Math.round(count * (1.1 + progress * 0.45));
+      const screenHours = (1.0 + Math.pow(progress, 1.8) * 8.6).toFixed(1);
+      const notifications = Math.round(count * (0.3 + Math.pow(progress, 2.1) * 1.4));
+      const blindersPct = Math.min(98, Math.round(4 + Math.min(1, count / 150) * 94));
+
+      document.getElementById('stat-brands').textContent = count;
+      document.getElementById('stat-accounts').textContent = totalAccounts;
+      document.getElementById('stat-screentime').textContent = screenHours + ' год';
+      document.getElementById('stat-notifs').textContent = notifications;
+      document.getElementById('stat-blinders-pct').textContent = blindersPct + '%';
+
+      const bar = document.getElementById('blinders-bar');
+      bar.style.width = blindersPct + '%';
+
+      const era = ERA_INFO.find(e => currentYear <= e.maxYear) || ERA_INFO[ERA_INFO.length - 1];
+      document.getElementById('era-badge').textContent = era.badge;
+      document.getElementById('era-desc').textContent = era.desc;
+
+      const headTilt = progress * 0.48;
+      headGroup.rotation.x = headTilt;
+      armsGroup.position.y = 3.5 + progress * 1.1;
+      phoneMesh.visible = currentYear >= 1983;
+      attentionCone.visible = currentYear >= 1995;
+      coneMat.opacity = Math.max(0, (progress - 0.3) * 0.35);
+      visorMat.opacity = Math.max(0, (progress - 0.4) * 0.85);
+
+      if (viewMode !== 'linear') {
+        const innerHole = Math.max(20, 82 - blindersPct * 0.54);
+        const darkAlpha = 0.25 + (blindersPct / 100) * 0.65;
+        blindersOverlay.style.background = `radial-gradient(circle at center, transparent ${innerHole}%, rgba(5, 6, 15, ${darkAlpha}) 100%)`;
+      } else {
+        blindersOverlay.style.background = 'radial-gradient(circle at center, transparent 80%, rgba(0,0,0,0.25) 100%)';
+      }
+
+      renderLegend(activeProfileNodes);
+    }
+
+    // ============================================================================
+    // 7. RAYCASTER НАВЕДЕННЯ МИШІ ТА ТУЛТІП
+    // ============================================================================
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(-999, -999);
+    const tooltip = document.getElementById('brand-tooltip');
+    let hoveredMesh = null;
+
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      if (hoveredMesh) {
+        tooltip.style.left = Math.min(window.innerWidth - 320, e.clientX + 16) + 'px';
+        tooltip.style.top = Math.min(window.innerHeight - 160, e.clientY + 16) + 'px';
+      }
+    });
+
+    // ============================================================================
+    // 8. ГОЛОВНИЙ ЦИКЛ АНІМАЦІЇ
+    // ============================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      if (isPlaying) {
+        playTimer += dt;
+        if (playTimer > 0.30) {
+          playTimer = 0;
+          if (currentYear < 2026) {
+            currentYear++;
+            yearSlider.value = currentYear;
+            updateSimulationState();
+          } else {
+            isPlaying = false;
+            document.getElementById('btn-play').textContent = '▶ Авто-еволюція';
+          }
+        }
+      }
+
+      const isGlobeLike = viewMode === 'globe' || viewMode === 'inside';
+      linearEnvGroup.visible = viewMode === 'linear';
+      humanGroup.visible = isGlobeLike && viewMode !== 'inside';
+
+      const progress = (currentYear - 1975) / (2026 - 1975);
+      const baseGlobeRadius = (15.5 - progress * 8.2) * (1 / squeezeFactor);
+
+      cocoonWire.visible = isGlobeLike && chkShell.checked;
+      cocoonDarkShell.visible = isGlobeLike && chkShell.checked;
+      if (isGlobeLike) {
+        const shellR = baseGlobeRadius + 1.5;
+        cocoonWire.scale.setScalar(shellR);
+        cocoonWire.rotation.y = elapsed * 0.07;
+        cocoonMat.opacity = 0.05 + progress * 0.22;
+        cocoonMat.color.setHSL(0.62 - progress * 0.58, 0.85, 0.55);
+
+        cocoonDarkShell.scale.setScalar(shellR + 2.8);
+        cocoonDarkMat.opacity = progress * 0.72;
+      }
+
+      const visibleMeshes = [];
+
+      brandNodes.forEach((node, i) => {
+        const isActive = node.inProfile && node.service.year <= currentYear;
+        node.mesh.visible = isActive;
+        node.tetherLine.visible = isActive && isGlobeLike && chkTethers.checked;
+
+        if (!isActive) return;
+        visibleMeshes.push(node.mesh);
+
+        let targetPos = new THREE.Vector3();
+
+        if (viewMode === 'linear') {
+          targetPos.copy(node.linearPos);
+          targetPos.y += Math.sin(elapsed * 2.0 + i) * 0.22;
+        } else {
+          const r = baseGlobeRadius + node.layerOffset * (1 / squeezeFactor);
+          const angle = node.theta + elapsed * node.orbitSpeed * (0.55 + progress * 0.85);
+          const yCenter = 5.2;
+
+          targetPos.x = r * Math.sin(node.phi) * Math.cos(angle);
+          targetPos.y = yCenter + r * Math.cos(node.phi) * 0.9;
+          targetPos.z = r * Math.sin(node.phi) * Math.sin(angle);
+        }
+
+        node.mesh.position.lerp(targetPos, 0.09);
+
+        const targetScale = (hoveredMesh === node.mesh ? 1.38 : 1.0) * iconScale;
+        node.mesh.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.16);
+
+        if (viewMode === 'inside') {
+          node.mesh.lookAt(0, 6.0, 0);
+        } else {
+          node.mesh.lookAt(camera.position);
+        }
+
+        if (node.tetherLine.visible) {
+          const posAttr = node.tetherLine.geometry.attributes.position;
+          posAttr.setXYZ(0, 0, 6.2, 0.4);
+          posAttr.setXYZ(1, node.mesh.position.x, node.mesh.position.y, node.mesh.position.z);
+          posAttr.needsUpdate = true;
+        }
+      });
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(visibleMeshes);
+      if (intersects.length > 0) {
+        const hitMesh = intersects[0].object;
+        if (hoveredMesh !== hitMesh) {
+          hoveredMesh = hitMesh;
+          const node = hitMesh.userData.node;
+          const srv = node.service;
+          const catInfo = CATEGORIES[srv.cat];
+          const ttIconEl = document.getElementById('tt-icon');
+          ttIconEl.style.backgroundImage = `url(${node.canvas.toDataURL()})`;
+          document.getElementById('tt-title').textContent = srv.name;
+          document.getElementById('tt-year').textContent = `${srv.year} р. • ${catInfo.name}`;
+          document.getElementById('tt-regions').textContent = srv.regions.map(r => REGION_LABELS[r] || r).join(' • ');
+          document.getElementById('tt-desc').textContent = srv.desc;
+          document.getElementById('tt-drain').textContent = `Вплив на зашореність: ${'▮'.repeat(srv.drain)}${'▯'.repeat(10 - srv.drain)} (${srv.drain}/10)`;
+          tooltip.classList.add('visible');
+          document.body.style.cursor = 'pointer';
+        }
+      } else if (hoveredMesh) {
+        hoveredMesh = null;
+        tooltip.classList.remove('visible');
+        document.body.style.cursor = 'default';
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    recalculateProfileLayout();
+    animate();
+  </script>
+</body>
+</html>
